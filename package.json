@@ -1,5 +1,5 @@
 {
-  "name": "WxToTg",
+  "name": "wx2tg",
   "version": "0.0.1",
   "description": "simple kit send wechat message to telegram",
   "main": "app.ts",
@@ -9,7 +9,12 @@
     "build": "tsc",
     "start": "NODE_ENV=pro tsc && node dist/app.js"
   },
-  "keywords": [],
+  "keywords": [
+    "wechat",
+    "telegram",
+    "wechaty",
+    "wechatbot"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -19,7 +24,7 @@
     "dotenv": "^16.0.3",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "gewechaty": "file:../../WebstormProjects/gewechaty/gewechaty-0.0.23.tgz",
+    "gewechaty": "^0.0.24",
     "https-proxy-agent": "^7.0.4",
     "jsdom": "^24.1.0",
     "log4js": "^6.9.1",
