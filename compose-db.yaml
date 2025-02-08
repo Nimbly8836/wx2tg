@@ -1,0 +1,15 @@
+# Use postgres/example user/password credentials ！！例子
+version: '3.9'
+
+services:
+
+  wx2tg-db:
+    image: postgres
+    restart: always
+    ports:
+      - "35432:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data # 宿主机路径仅仅是例子，换成你的
+    environment:
+      POSTGRES_PASSWORD: example
+      PGDATA: /var/lib/postgresql/data/pgdata

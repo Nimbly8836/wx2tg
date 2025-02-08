@@ -1,0 +1,92 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/client"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model config {
+  id          Int          @id @default(autoincrement())
+  bot_chat_id BigInt
+  bot_token   String       @db.VarChar
+  login_wxid  String       @unique @db.VarChar
+  setting     Json?        @db.Json
+  wx_contact  wx_contact[]
+  wx_room     wx_room[]
+}
+
+model group {
+  id          Int       @id @default(autoincrement())
+  tg_group_id BigInt
+  group_name  String?   @db.VarChar(64)
+  wx_id       String    @db.VarChar(64)
+  forward     Int?      @default(1) @db.SmallInt
+  allow_ids   BigInt[]
+  create_at   DateTime? @default(now()) @db.Timestamptz(6)
+  modify_at   DateTime? @default(now()) @db.Timestamptz(6)
+  message     message[]
+}
+
+model message {
+  id         BigInt    @id @default(autoincrement())
+  group_id   Int?
+  from_id    BigInt
+  content    String?
+  is_deleted Int?      @default(0) @db.SmallInt
+  parent_id  BigInt?
+  create_at  DateTime? @default(now()) @db.Timestamptz(6)
+  modify_at  DateTime? @default(now()) @db.Timestamptz(6)
+  group      group?    @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model wx_contact {
+  wx_id           String  @db.VarChar
+  userName        String  @db.VarChar
+  nickName        String? @db.VarChar
+  pyInitial       String? @db.VarChar
+  quanPin         String? @db.VarChar
+  sex             Int?
+  remark          String? @db.VarChar
+  remarkPyInitial String? @db.VarChar
+  remarkQuanPin   String? @db.VarChar
+  signature       String? @db.VarChar
+  alias           String? @db.VarChar
+  snsBgImg        String? @db.VarChar
+  country         String? @db.VarChar
+  bigHeadImgUrl   String? @db.VarChar
+  smallHeadImgUrl String? @db.VarChar
+  description     String? @db.VarChar
+  cardImgUrl      String? @db.VarChar
+  labelList       String? @db.VarChar
+  province        String? @db.VarChar
+  city            String? @db.VarChar
+  phoneNumList    String? @db.VarChar
+  id              Int     @id(map: "wx_contact_pk") @default(autoincrement())
+  config          config  @relation(fields: [wx_id], references: [login_wxid], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([wx_id, userName], map: "wx_contact_unique_index")
+}
+
+model wx_room {
+  wx_id           String  @db.VarChar
+  chatroomId      String  @db.VarChar
+  nickName        String? @db.VarChar
+  pyInitial       String? @db.VarChar
+  quanPin         String? @db.VarChar
+  sex             Int?
+  remark          String? @db.VarChar
+  remarkPyInitial String? @db.VarChar
+  remarkQuanPin   String? @db.VarChar
+  chatRoomNotify  Int?
+  chatRoomOwner   String? @db.VarChar
+  smallHeadImgUrl String? @db.VarChar
+  memberList      String? @db.VarChar
+  id              Int     @id(map: "wx_room_pk") @default(autoincrement())
+  config          config  @relation(fields: [wx_id], references: [login_wxid], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([wx_id, chatroomId], map: "wx_room_wx_id_room_id_uindex")
+}
