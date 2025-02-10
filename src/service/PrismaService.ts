@@ -2,7 +2,7 @@ import {Singleton} from "../base/IService";
 import {ConfigEnv} from "../config/Config";
 import {Database} from "sqlite3";
 import {WxConcat, WxRoom} from "../entity/WeChatSqlite";
-import {PrismaClient} from "../generated/client";
+import {PrismaClient} from "@prisma/client";
 
 
 export default class PrismaService extends Singleton<PrismaService> {
@@ -23,6 +23,14 @@ export default class PrismaService extends Singleton<PrismaService> {
 
     public config() {
         return this.prisma.config
+    }
+
+    public async getConfigByToken() {
+        return this.prisma.config.findFirst({
+            where: {
+                bot_token: ConfigEnv.BOT_TOKEN
+            }
+        })
     }
 
 

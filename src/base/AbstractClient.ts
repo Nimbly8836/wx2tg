@@ -5,11 +5,12 @@ import IService from "./IService";
 import {SendMessage} from "./IMessage";
 import {ClientEnum} from "../constant/ClientConstants";
 
-export abstract class AbstractClient implements IClient, IService {
+export abstract class AbstractClient<T> implements IClient, IService {
     logger: Logger;
-    bot: any;
+    bot: T;
 
-    protected spyClients: Map<ClientEnum, AbstractClient> = new Map<ClientEnum, AbstractClient>();
+    protected spyClients: Map<ClientEnum, AbstractClient<any>> = new Map<ClientEnum, AbstractClient<any>>();
+    protected static instance: AbstractClient<any> | null = null;
 
     ready: boolean = false;
     hasLogin: boolean = false;
@@ -38,5 +39,4 @@ export abstract class AbstractClient implements IClient, IService {
         this.logger.info(message, ...args);
     }
 
-    protected static instance: AbstractClient | null = null;
 }

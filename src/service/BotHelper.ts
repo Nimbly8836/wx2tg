@@ -6,6 +6,8 @@ import {ClientEnum} from "../constant/ClientConstants";
 import {SimpleClientFactory} from "../base/Factory";
 import PrismaService from "./PrismaService";
 import {ConfigEnv} from "../config/Config";
+import TgClient from "../client/TgClient";
+import {WxClient} from "../client/WxClient";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -45,16 +47,28 @@ export default class BotHelper extends Singleton<BotHelper> {
                                 login_wxid: '',
                             }
                         }).then(() => {
-                            ctx.reply('应用启动成功，请按照提示登录 TG 和 微信')
+                            TgClient.getInstance().login().then(r => {
+                                if (r) {
+                                    ctx.reply('Tg 登陆成功')
+                                }
+                            })
                         }).catch(e => {
                             ctx.reply('应用启动失败')
                         })
+                    } else {
+                        if (!r?.tg_login) {
+                            TgClient.getInstance().login().then(r => {
+                                if (r) {
+                                    ctx.reply('Tg 登陆成功')
+                                }
+                            })
+                        }
                     }
                 })
         })
 
         bot.command('login', (ctx) => {
-            let WxClient = SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT);
+            let WxClient = SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT) as WxClient;
             WxClient.login().then(r => {
                 ctx.reply(r ? '登陆成功' : '登陆失败')
             })

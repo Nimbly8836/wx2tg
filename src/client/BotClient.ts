@@ -3,12 +3,10 @@ import {Context, session, Telegraf} from "telegraf";
 import {ConfigEnv} from "../config/Config";
 import BotHelper from "../service/BotHelper";
 import {SendMessage} from "../base/IMessage";
-import {ClientEnum} from "../constant/ClientConstants";
-import {SimpleClientFactory} from "../base/Factory";
+import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
+import PrismaService from "../service/PrismaService";
 
-export default class BotClient extends AbstractClient {
-
-    bot: Telegraf;
+export default class BotClient extends AbstractClient<Telegraf> {
 
     private constructor() {
         super();
@@ -25,7 +23,7 @@ export default class BotClient extends AbstractClient {
     }
 
     private initialize(): void {
-        this.spyClients.set(ClientEnum.WX_BOT, SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT))
+        this.spyClients.set(ClientEnum.WX_BOT, getClientByEnum(ClientEnum.WX_BOT));
 
     }
 
@@ -35,10 +33,18 @@ export default class BotClient extends AbstractClient {
             this.hasLogin = true
             this.initBot()
             this.bot.launch().then(() => {
-                this.logInfo('BotClient start success...')
+                PrismaService.getInstance(PrismaService).getConfigByToken().then(config => {
+                    if (!config.tg_login) {
+                        this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请先输入 /start，然后按照提示登录 Telegram`)
+                    }
+                    if (!config.login_wxid) {
+                        this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请使用命令 /login 登录微信`)
+                    }
+                })
             }).catch((e) => {
                 this.logError('BotClient start error : %s', e)
             })
+            // this.bot.start()
         })
     }
 
@@ -54,7 +60,11 @@ export default class BotClient extends AbstractClient {
         })
     }
 
-    sendMessage(msg: SendMessage): Promise<object> {
+    async sendMessage(msg: SendMessage): Promise<object> {
+        // 默认发送到 bot_chat_id
+        if (!msg.chatId) {
+            msg.chatId = Number((await PrismaService.getInstance(PrismaService).getConfigByToken()).bot_chat_id)
+        }
         return new Promise<object>((resolve, reject) => {
             let result = null
             switch (msg.msgType) {

@@ -7,7 +7,7 @@ export type SendMessage = {
     file?: Buffer,
     fileName?: string,
     ext?: object,
-    chatId?: string,
+    chatId?: number,
 }
 
 export type SendingMessage = SendMessage & {

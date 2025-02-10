@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "NODE_ENV=pro tsc && node dist/app.js"
+    "start": "NODE_ENV=pro tsc && node dist/app.js",
+    "init-db": "prisma migrate dev --name init"
   },
   "keywords": [
     "wechat",

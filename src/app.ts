@@ -13,4 +13,5 @@ process.on('uncaughtException', (err) => {
 
 process.on('exit', (code) => {
     LogUtils.error('wechat2Tg exit', code)
+    process.exitCode = code
 })
