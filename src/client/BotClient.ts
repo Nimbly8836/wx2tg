@@ -42,6 +42,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     }
                 })
             }).catch((e) => {
+                this.hasLogin = false
                 this.logError('BotClient start error : %s', e)
             })
             // this.bot.start()
@@ -75,16 +76,21 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     result = this.bot.telegram.sendPhoto(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "audio":
+                    result = this.bot.telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "video":
+                    result = this.bot.telegram.sendVideo(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "file":
+                    result = this.bot.telegram.sendDocument(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "location":
+                    if (!msg.ext.latitude || !msg.ext.longitude) {
+                        reject('location message must have ext')
+                    }
+                    result = this.bot.telegram.sendLocation(msg.chatId, msg.ext.latitude, msg.ext.longitude)
                     break;
-                case "link":
-                    break;
-                case "event":
+                default:
                     break;
             }
             resolve(result)

@@ -2,11 +2,13 @@ import {ClientEnum} from "../constant/ClientConstants";
 
 export type SendMessage = {
     id?: string,
-    msgType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'location' | 'link' | 'event',
+    msgType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'location',
     content?: string,
     file?: Buffer,
     fileName?: string,
-    ext?: object,
+    ext?: {
+        [key: string]: any,
+    },
     chatId?: number,
 }
 

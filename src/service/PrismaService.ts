@@ -62,7 +62,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                 })
             }
         })
-        sqliteDatabase.all<WxRoom>('SELECT * FROM room', (err, rows) => {
+        sqliteDatabase.all<WxRoom>('SELECT * FROM room where chatroomId is not null', (err, rows) => {
             if (rows) {
                 this.prisma.wx_room.createManyAndReturn({
                     data: rows.map(r => {

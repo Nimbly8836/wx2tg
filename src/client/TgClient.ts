@@ -9,7 +9,6 @@ import BotClient from "./BotClient";
 import PrismaService from "../service/PrismaService";
 import {Telegraf} from "telegraf";
 import {message} from "telegraf/filters";
-import QRCode from "qrcode";
 import {Api} from "telegram";
 
 
@@ -58,45 +57,50 @@ export default class TgClient extends AbstractClient<TelegramClient> {
         const prisma = PrismaService.getInstance(PrismaService)
         return new Promise((resolve, reject) => {
             this.bot.connect().then(async () => {
-                let tgScanMsgId = 0
-                const config = await prisma.getConfigByToken()
-                const user = await this.bot.signInUserWithQrCode({apiId: ConfigEnv.API_ID, apiHash: ConfigEnv.API_HASH},
-                    {
-                        onError: (e) => {
-                            if (e) {
-                                tgBot.telegram.sendMessage(Number(config.bot_chat_id), `登录失败：${e}`)
-                            }
-                        },
-                        password: async (hint) => {
-                            return new Promise<string>(resolve => {
-                                tgBot.telegram.sendMessage(Number(config.bot_chat_id),
-                                    `请回复这条消息，输入二步验证码，密码提示：${hint}`)
-                                    .then(res => {
-                                        tgBot.on(message('reply_to_message'), (ctx) => {
-                                            const password = ctx.text.trim();
-                                            resolve(password)
-                                        })
-                                    })
+                const b = await this.bot.checkAuthorization();
+                if (b) {
+                    resolve(true)
+                    return
+                }
+                const rmMsgId = []
+                const waitInput = (textMsg: string) => {
+                    return new Promise<string>(resolve => {
+                        tgBot.telegram.sendMessage(Number(config.bot_chat_id),
+                            `${textMsg}`)
+                            .then(res => {
+                                rmMsgId.push(res.message_id)
+                                tgBot.on(message('reply_to_message'), (ctx) => {
+                                    const password = ctx.text.trim();
+                                    rmMsgId.push(ctx.message.message_id)
+                                    resolve(password)
+                                })
                             })
-                        },
-                        qrCode: async (code) => {
-                            // console.log(`tg://login?token=${code.token.toString("base64url")}`);
-                            QRCode.toBuffer(`tg://login?token=${code.token.toString("base64url")}`, {
-                                width: 150
-                            }, (error, buffer) => {
-                                tgBot.telegram.sendPhoto(Number(config.bot_chat_id),
-                                    {source: buffer},
-                                    {caption: '请使用 Telegram 扫码登录'})
-                                    .then((res) => {
-                                        tgScanMsgId = res.message_id
-                                    })
-                            })
-                        },
                     })
-                if (user) {
-                    tgBot.telegram.editMessageCaption(Number(config.bot_chat_id),
-                        tgScanMsgId, undefined,
-                        'TG 登录成功').then(() => {
+                }
+                const config = await prisma.getConfigByToken()
+                this.bot.start({
+                    onError: (e) => {
+                        if (e) {
+                            tgBot.telegram.sendMessage(Number(config.bot_chat_id), `登录失败：${e}`)
+                        }
+                    },
+                    phoneNumber: async () => {
+                        return waitInput('请回复这条消息，输入你的手机号码，例如：+8612345678901')
+                    },
+                    password: async (hint) => {
+                        return waitInput(`请回复这条消息，输入二步验证码，密码提示：${hint}`)
+                    },
+                    phoneCode: async () => {
+                        return waitInput('请回复这条消息，输入短信验证码')
+                    },
+
+                }).then(() => {
+                    // 删除消息
+                    tgBot.telegram.deleteMessages(Number(config.bot_chat_id),
+                        rmMsgId)
+                    tgBot.telegram.sendMessage(Number(config.bot_chat_id),
+                        'TG 登录成功',
+                    ).then(() => {
                         prisma.config().updateMany({
                             where: {bot_token: ConfigEnv.BOT_TOKEN},
                             data: {tg_login: true}
@@ -104,9 +108,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                         this.hasLogin = true
                         resolve(true)
                     })
-                } else {
-                    reject(false)
-                }
+                })
             })
         })
 
@@ -152,7 +154,6 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                                 msgType: 'text',
                                 content: '已经到达文件夹创建的上限，不能再创建新的文件夹'
                             })
-                            return
                         }
                     })
                 })

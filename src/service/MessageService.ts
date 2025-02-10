@@ -4,6 +4,7 @@ import {Snowflake} from "nodejs-snowflake";
 import {ClientEnum} from "../constant/ClientConstants";
 import IClient from "../base/IClient";
 import {SimpleClientFactory} from "../base/Factory";
+import {LogUtils} from "../util/LogUtils";
 
 export class MessageService extends Singleton<MessageService> {
     public static readonly snowflake = new Snowflake();
@@ -55,8 +56,9 @@ export class MessageService extends Singleton<MessageService> {
                 const send = client.sendMessage(sendMessage).then(() => {
                     sendMessage.success = true
                     sendMessage.isSending = false
+                    // TODO: save message to db
                 }).catch(async e => {
-                    this.logError('Failed to send message', e)
+                    LogUtils.error('Failed to send message', e)
                 })
                 send.catch(() => send)
                     .finally(() => {

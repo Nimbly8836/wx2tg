@@ -6,7 +6,6 @@ import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
 import WxMessageHelper from "../service/WxMessageHelper";
-import {MessageService} from "../service/MessageService";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -42,10 +41,12 @@ export class WxClient extends AbstractClient<GeweBot> {
                 // 更新 config 表 wx_id 插入缓存的 concat 和 room
                 let prismaService = PrismaService.getInstance(PrismaService);
                 const config = prismaService.config()
-                this.bot.info().then(info => {
+                this.bot.info().then(async info => {
+                    const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+                    const botId = Number(botClient.bot.botInfo.id)
                     config.updateMany({
                         where: {bot_token: ConfigEnv.BOT_TOKEN},
-                        data: {login_wxid: info.wxid}
+                        data: {login_wxid: info.wxid, bot_id: botId}
                     }).then(() => {
                         prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
                     })
@@ -89,16 +90,13 @@ export class WxClient extends AbstractClient<GeweBot> {
             }
         })
         this.bot.on('message', async (msg) => {
-            const messageService = MessageService.getInstance(MessageService);
-            const wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
-            wxMessageHelper.createGroup(msg).then((res) => {
-                if (res) {
+                const wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
+                wxMessageHelper.sendMessages(msg)
+            }
+        )
+        this.bot.on('room-invite', async (msg) => {
 
-                }
-            })
         })
-
-        // this.bot.on('')
     }
 
 }
