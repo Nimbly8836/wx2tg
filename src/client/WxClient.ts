@@ -19,6 +19,8 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
     }
 
+    private loginTime: number = 0
+
     static getInstance(): WxClient {
         if (this.instance == null) {
             this.instance = new WxClient();
@@ -51,6 +53,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                         prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
                     })
                 })
+                this.loginTime = new Date().getTime() / 1000
                 resolve(true)
             }).catch(e => {
                 reject(e)
@@ -91,7 +94,10 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         this.bot.on('message', async (msg) => {
                 const wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
-                wxMessageHelper.sendMessages(msg)
+                // 只处理登录之后的消息
+                if (msg._createTime >= this.loginTime) {
+                    wxMessageHelper.sendMessages(msg)
+                }
             }
         )
         this.bot.on('room-invite', async (msg) => {

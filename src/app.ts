@@ -1,9 +1,10 @@
 import {LogUtils} from "./util/LogUtils";
 import {SimpleClientFactory} from "./base/Factory";
 import {ClientEnum} from "./constant/ClientConstants";
+import BotClient from "./client/BotClient";
 
-let botClient = SimpleClientFactory.getSingletonClient(ClientEnum.TG_BOT);
-botClient.login().then(() => {
+let botClient = SimpleClientFactory.getSingletonClient(ClientEnum.TG_BOT) as BotClient;
+botClient.start().then(() => {
     LogUtils.info('start success...')
 })
 

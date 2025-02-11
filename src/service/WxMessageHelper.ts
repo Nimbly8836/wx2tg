@@ -14,6 +14,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
     private prismaService = PrismaService.getInstance(PrismaService);
     private messageService = MessageService.getInstance(MessageService);
+    private tgUserClient = TgClient.getInstance()
 
     constructor() {
         super();
@@ -48,15 +49,18 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
         } else {
             wxId = msg.roomId
         }
+        // 自己发的消息不创建新的文件夹
+        if (wxId === msg.wxid) {
+            wxId = msg.isRoom ? msg.roomId : msg.toId
+        }
         return new Promise((resolve, reject) => {
             this.prismaService.prisma.group.findFirst({
                 where: {wx_id: wxId}
             }).then(async existGroup => {
                 if (!existGroup) {
-                    const tgUserBot = TgClient.getInstance().bot
                     const config = await this.prismaService.getConfigByToken()
                     const title = await this.getTitle(msg) || 'wx2tg_未命名群组';
-                    tgUserBot?.invoke(
+                    this.tgUserClient.bot?.invoke(
                         new Api.messages.CreateChat({
                             users: [Number(config.bot_chat_id), Number(config.bot_id)],
                             title: title,
@@ -74,10 +78,12 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         this.prismaService.prisma.group.create({
                             data: createGroup
                         }).then((res) => {
+                            this.addToFolder(Number(res.tg_group_id))
                             resolve(res)
                         })
                     })
                 } else {
+                    this.addToFolder(Number(existGroup.tg_group_id))
                     resolve(existGroup)
                 }
             }).catch(e => {
@@ -89,7 +95,6 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
     public async sendMessages(msg: Message) {
         const wxMsgType = WxClient.getInstance().bot.Message.Type;
-        const tgClient = TgClient.getInstance();
         this.createGroup(msg).then((res) => {
             if (res) {
                 const chatId = Number(res.tg_group_id);
@@ -136,6 +141,39 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
             }
 
         })
+    }
+
+    async addToFolder(chatId: number): Promise<void> {
+        this.tgUserClient.bot?.invoke(new Api.messages.GetDialogFilters()).then(result => {
+            const dialogFilter: Api.TypeDialogFilter = result?.filters.find(it => {
+                return it instanceof Api.DialogFilter && it.title === TgClient.DIALOG_TITLE
+            })
+
+            this.tgUserClient.bot?.getInputEntity(chatId).then(entity => {
+                if (entity && dialogFilter instanceof Api.DialogFilter) {
+                    const exist = dialogFilter.includePeers.find(it => {
+                        if (it instanceof Api.InputPeerChat && entity instanceof Api.InputPeerChat) {
+                            return it.chatId === entity.chatId
+                        }
+                        if (it instanceof Api.InputPeerChannel && entity instanceof Api.InputPeerChannel) {
+                            return it.channelId === entity.channelId
+                        }
+                    })
+                    if (!exist) {
+                        dialogFilter.includePeers.push(entity)
+                        this.tgUserClient.bot?.invoke(new Api.messages.UpdateDialogFilter({
+                            id: dialogFilter.id,
+                            filter: dialogFilter,
+                        })).catch(e => {
+                            LogUtils.warn('添加到文件夹失败: %s', e)
+                        })
+                    }
+                }
+            })
+
+        })
+
+
     }
 
 

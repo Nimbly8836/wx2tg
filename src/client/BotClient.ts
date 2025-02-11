@@ -5,6 +5,8 @@ import BotHelper from "../service/BotHelper";
 import {SendMessage} from "../base/IMessage";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import PrismaService from "../service/PrismaService";
+import TgClient from "./TgClient";
+import {WxClient} from "./WxClient";
 
 export default class BotClient extends AbstractClient<Telegraf> {
 
@@ -27,12 +29,14 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     }
 
-
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
             this.hasLogin = true
             this.initBot()
-            this.bot.launch().then(() => {
+            this.bot.launch(() => {
+                this.hasLogin = true
+                resolve(true)
+            }).then(() => {
                 PrismaService.getInstance(PrismaService).getConfigByToken().then(config => {
                     if (!config.tg_login) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请先输入 /start，然后按照提示登录 Telegram`)
@@ -40,12 +44,13 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     if (!config.login_wxid) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请使用命令 /login 登录微信`)
                     }
+                    resolve(true)
                 })
             }).catch((e) => {
                 this.hasLogin = false
                 this.logError('BotClient start error : %s', e)
+                reject(e)
             })
-            // this.bot.start()
         })
     }
 
@@ -111,8 +116,16 @@ export default class BotClient extends AbstractClient<Telegraf> {
         })
     }
 
-    public start(): void {
-
+    public async start() {
+        return new Promise((resolve, reject) => {
+            this.login().then(() => {
+                TgClient.getInstance().login().then(() => {
+                    WxClient.getInstance().login().then(() => {
+                        resolve(true);
+                    }).catch(reject);
+                }).catch(reject);
+            }).catch(reject);
+        });
     }
 
 }
