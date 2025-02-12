@@ -73,27 +73,37 @@ export default class BotClient extends AbstractClient<Telegraf> {
         }
         return new Promise<object>((resolve, reject) => {
             let result = null
+            const telegram = this.bot.telegram;
             switch (msg.msgType) {
+                case "quote":
+                    // TODO 先直接发送原始消息的文本，后续存储了消息之后处理
+                    //  { title: '发送的消息', referMsg_title: '引用的消息' }
+                    let content = `<blockquote>${msg.ext?.referMsg_title}</blockquote>${msg.ext?.title}`
+                    result = telegram.sendMessage(msg.chatId,
+                        content, {
+                            parse_mode: 'HTML',
+                        })
+                    break;
                 case "text":
-                    result = this.bot.telegram.sendMessage(msg.chatId, msg.content, msg.ext)
+                    result = telegram.sendMessage(msg.chatId, msg.content, msg.ext)
                     break;
                 case "image":
-                    result = this.bot.telegram.sendPhoto(msg.chatId, {source: msg.file}, msg.ext)
+                    result = telegram.sendPhoto(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "audio":
-                    result = this.bot.telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
+                    result = telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "video":
-                    result = this.bot.telegram.sendVideo(msg.chatId, {source: msg.file}, msg.ext)
+                    result = telegram.sendVideo(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "file":
-                    result = this.bot.telegram.sendDocument(msg.chatId, {source: msg.file}, msg.ext)
+                    result = telegram.sendDocument(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "location":
                     if (!msg.ext.latitude || !msg.ext.longitude) {
                         reject('location message must have ext')
                     }
-                    result = this.bot.telegram.sendLocation(msg.chatId, msg.ext.latitude, msg.ext.longitude)
+                    result = telegram.sendLocation(msg.chatId, msg.ext.latitude, msg.ext.longitude)
                     break;
                 default:
                     break;

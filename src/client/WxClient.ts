@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
 import WxMessageHelper from "../service/WxMessageHelper";
+import {LogUtils} from "../util/LogUtils";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -36,30 +37,37 @@ export class WxClient extends AbstractClient<GeweBot> {
 
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
+            try {
 
-            this.bot.start().then(async ({app, router}) => {
-                app.use(router.routes()).use(router.allowedMethods())
+                this.bot.start().then(async ({app, router}) => {
+                    app.use(router.routes()).use(router.allowedMethods())
 
-                // 更新 config 表 wx_id 插入缓存的 concat 和 room
-                let prismaService = PrismaService.getInstance(PrismaService);
-                const config = prismaService.config()
-                this.bot.info().then(async info => {
-                    const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
-                    const botId = Number(botClient.bot.botInfo.id)
-                    config.updateMany({
-                        where: {bot_token: ConfigEnv.BOT_TOKEN},
-                        data: {login_wxid: info.wxid, bot_id: botId}
-                    }).then(() => {
-                        prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                    // 更新 config 表 wx_id 插入缓存的 concat 和 room
+                    let prismaService = PrismaService.getInstance(PrismaService);
+                    const config = prismaService.config()
+                    this.bot.info().then(async info => {
+                        const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+                        const botId = Number(botClient.bot.botInfo.id)
+                        config.updateMany({
+                            where: {bot_token: ConfigEnv.BOT_TOKEN},
+                            data: {login_wxid: info.wxid, bot_id: botId}
+                        }).then(() => {
+                            prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                        })
+                    }).catch(e => {
+                        LogUtils.error('WxClient get info error : %s', e)
                     })
+                }).catch(e => {
+                    reject(e)
                 })
+
+                this.onMessage(null)
                 this.loginTime = new Date().getTime() / 1000
                 resolve(true)
-            }).catch(e => {
+            } catch (e) {
+                LogUtils.error('WxClient login error : %s', e)
                 reject(e)
-            })
-
-            this.onMessage(null)
+            }
 
         })
     }

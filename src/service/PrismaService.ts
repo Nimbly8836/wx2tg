@@ -92,4 +92,46 @@ export default class PrismaService extends Singleton<PrismaService> {
         sqliteDatabase.close()
     }
 
+    public async pageWxContact(queryName: string, take: number | 10, skip: number | 0) {
+        if (queryName) {
+            return this.prisma.wx_contact.findMany({
+                where: {
+                    OR: [
+                        {nickName: {contains: queryName}},
+                        {pyInitial: {contains: queryName}},
+                        {quanPin: {contains: queryName}},
+                        {remark: {contains: queryName}},
+                        {remarkPyInitial: {contains: queryName}},
+                        {remarkQuanPin: {contains: queryName}},
+                    ]
+                },
+                take: take,
+                skip: skip
+            })
+        } else {
+            return this.prisma.wx_contact.findMany({
+                take: take,
+                skip: skip
+            })
+        }
+    }
+
+    public async countWxContact(queryName: string) {
+        if (queryName) {
+            return this.prisma.wx_contact.count({
+                where: {
+                    OR: [
+                        {nickName: {contains: queryName}},
+                        {pyInitial: {contains: queryName}},
+                        {quanPin: {contains: queryName}},
+                        {remark: {contains: queryName}},
+                        {remarkPyInitial: {contains: queryName}},
+                        {remarkQuanPin: {contains: queryName}},
+                    ],
+                },
+            })
+        } else {
+            return this.prisma.wx_contact.count()
+        }
+    }
 }

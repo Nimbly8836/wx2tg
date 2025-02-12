@@ -1,5 +1,5 @@
 import {Singleton} from "../base/IService";
-import {Message} from "gewechaty";
+import {Contact, Message} from "gewechaty";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {Api} from "telegram";
@@ -9,6 +9,7 @@ import {WxClient} from "../client/WxClient";
 import {ClientEnum} from "../constant/ClientConstants";
 import {MessageService} from "./MessageService";
 import {LogUtils} from "../util/LogUtils";
+import {parseQuoteMsg} from "../util/MessageUtils";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
@@ -30,13 +31,24 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                 })
             } else {
                 msg.from().then(contact => {
-                    contact.alias().then(alias => {
-                        if (alias) {
-                            resolve(alias)
-                        } else {
-                            resolve(contact.name())
-                        }
-                    })
+                    const getTitle = (_contact: Contact) => {
+                        _contact.alias()
+                            .then(alias => {
+                                if (alias) {
+                                    resolve(alias)
+                                } else {
+                                    resolve(_contact.name())
+                                }
+                            });
+                    }
+                    // 自己的情况下 名称用对方的
+                    if (contact._wxid === msg.wxid) {
+                        msg.to().then(toContact => {
+                            getTitle(toContact)
+                        })
+                    } else {
+                        getTitle(contact)
+                    }
                 })
             }
         })
@@ -83,7 +95,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         })
                     })
                 } else {
-                    this.addToFolder(Number(existGroup.tg_group_id))
+                    // this.addToFolder(Number(existGroup.tg_group_id))
                     resolve(existGroup)
                 }
             }).catch(e => {
@@ -95,25 +107,31 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
     public async sendMessages(msg: Message) {
         const wxMsgType = WxClient.getInstance().bot.Message.Type;
-        this.createGroup(msg).then((res) => {
+        this.createGroup(msg).then(async (res) => {
             if (res) {
                 const chatId = Number(res.tg_group_id);
-                let textContent = '收到消息';
+                // let textContent = '收到消息';
                 switch (msg.type()) {
                     case wxMsgType.Unknown:
-                        textContent = '未知消息: ' + msg.text();
+                        break;
                     case wxMsgType.RedPacket:
-                        textContent = '收到红包';
-                    case wxMsgType.Text:
-                        textContent = msg.text();
-                        this.messageService.addMessages({
-                            chatId: chatId,
-                            content: textContent,
-                            msgType: 'text',
-                        }, ClientEnum.TG_BOT)
                         break;
                     case wxMsgType.Quote:
-                        // TODO
+                        // TODO 处理引用消息
+                        const quoteMsg = await parseQuoteMsg(msg.text());
+                        LogUtils.debug('Quote message: %s', quoteMsg)
+                        this.messageService.addMessages({
+                            chatId: chatId,
+                            ext: quoteMsg,
+                            msgType: 'quote',
+                        }, ClientEnum.TG_BOT)
+                        break;
+                    case wxMsgType.Text:
+                        this.messageService.addMessages({
+                            chatId: chatId,
+                            content: msg.text(),
+                            msgType: 'text',
+                        }, ClientEnum.TG_BOT)
                         break;
                     // 文件类型的消息
                     case wxMsgType.Image:
@@ -135,6 +153,10 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             })
                         break;
                     case wxMsgType.Emoji:
+                        LogUtils.debug('Emoji message: %s', msg.text())
+                        break;
+                    case wxMsgType.Pat:
+                        LogUtils.debug('Pat message: %s', msg.text())
                         break;
                 }
 

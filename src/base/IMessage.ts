@@ -2,7 +2,7 @@ import {ClientEnum} from "../constant/ClientConstants";
 
 export type SendMessage = {
     id?: string,
-    msgType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'location',
+    msgType: 'text' | 'image' | 'audio' | 'video' | 'file' | 'location' | 'quote',
     content?: string,
     file?: Buffer,
     fileName?: string,

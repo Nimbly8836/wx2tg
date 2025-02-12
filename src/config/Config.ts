@@ -16,7 +16,7 @@ export const ConfigEnv = {
     } as ProxyOptions,
     BASE_API: process.env.BASE_API || '',
     FILE_API: process.env.FILE_API || '',
-    LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+    LOG_LEVEL: process.env.LOG_LEVEL || 'default',
 }
 
 export type ProxyOptions = {

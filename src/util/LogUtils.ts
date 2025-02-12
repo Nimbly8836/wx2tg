@@ -1,4 +1,5 @@
 import log4js, {Logger} from 'log4js'
+import {ConfigEnv} from "../config/Config";
 
 export class LogUtils {
 
@@ -31,7 +32,7 @@ export class LogUtils {
                     error: { appenders: ['errorFile'], level: 'error' }
                 }
             });
-            LogUtils.logger = log4js.getLogger('default');
+            LogUtils.logger = log4js.getLogger(ConfigEnv.LOG_LEVEL);
         }
     }
 

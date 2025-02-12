@@ -15,7 +15,7 @@ export default class ConfigCheck {
         if (ConfigEnv.PROXY_CONFIG.hasProxy) {
             const {host, port} = ConfigEnv.PROXY_CONFIG;
             try {
-                await ConfigCheck.checkServerConnection(host, parseInt(port));
+                await ConfigCheck.checkServerConnection(host, port);
                 LogUtils.info('Proxy connection successful');
             } catch (error) {
                 throw new Error(`Failed to connect to proxy: ${error}`);
