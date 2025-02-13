@@ -10,6 +10,9 @@ import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
 import {initPaginationCallback, PagedResult, registerPagination, sendPagedList} from "../util/PageHelper";
 import {wx_contact} from "@prisma/client";
+import * as fs from "node:fs";
+import {message} from "telegraf/filters";
+import {LogUtils} from "../util/LogUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -32,6 +35,7 @@ export default class BotHelper extends Singleton<BotHelper> {
     }
 
     public onCommand(bot: Telegraf) {
+        this.onUse(bot)
         bot.command('help', (ctx) => {
             ctx.reply('help')
         })
@@ -75,9 +79,47 @@ export default class BotHelper extends Singleton<BotHelper> {
             })
         })
 
+        bot.command('rmds', (ctx) => {
+            // 删除 ds.json 文件
+            if (fs.existsSync('ds.json')) {
+                fs.unlinkSync('ds.json');
+            }
+            ctx.reply('成功')
+        })
+
         this.user(bot)
         // 分页初始化
         initPaginationCallback(bot)
+    }
+
+    public onUse(bot: Telegraf) {
+        const geweBot = WxClient.getInstance().bot;
+        // bot.use(async (ctx, next) => {
+        //
+        // })
+
+        bot.on(message('text'), async ctx => {
+            const text = ctx.message.text;
+            LogUtils.debug('text : %s', text)
+            this.prismaService.prisma.group.findUnique({
+                where: {
+                    tg_group_id: ctx.chat.id
+                }
+            }).then(r => {
+                if (r?.is_wx_room) {
+                    // @ts-ignore
+                    geweBot.Room.find({id: r.wx_id}).then(room => {
+                        room.say(text)
+                    })
+                } else {
+                    geweBot.Contact.find({id: r.wx_id}).then(contact => {
+                        contact.say(text)
+                    })
+                }
+
+            })
+        })
+
     }
 
     private async user(bot: Telegraf) {
@@ -114,7 +156,7 @@ export default class BotHelper extends Singleton<BotHelper> {
             const queryUser = ctx.args?.[0] || ''
             await sendPagedList(ctx, 'USER', {
                 pageNo: 1,
-                pageSize: 10,
+                pageSize: 12,
                 columns: 3
             }, {
                 keyword: queryUser,
@@ -126,10 +168,6 @@ export default class BotHelper extends Singleton<BotHelper> {
             await ctx.reply(`你点击了用户 ID = ${userId}`)
             await ctx.answerCbQuery()
         })
-    }
-
-    public sendMessage(message: SendMessage) {
-        MessageService.getInstance(MessageService).addMessages(message, ClientEnum.TG_BOT)
     }
 
 }

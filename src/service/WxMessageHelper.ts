@@ -3,13 +3,14 @@ import {Contact, Message} from "gewechaty";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {Api} from "telegram";
-import BotClient from "../client/BotClient";
 import type {group} from '@prisma/client'
 import {WxClient} from "../client/WxClient";
 import {ClientEnum} from "../constant/ClientConstants";
 import {MessageService} from "./MessageService";
 import {LogUtils} from "../util/LogUtils";
-import {parseQuoteMsg} from "../util/MessageUtils";
+import {parseAppMsgMessagePayload, parseQuoteMsg} from "../util/MessageUtils";
+import {SendMessage} from "../base/IMessage";
+import FileUtils from "../util/FileUtils";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
@@ -86,6 +87,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             wx_id: wxId,
                             tg_group_id: -groupId,
                             group_name: title,
+                            is_wx_room: msg.isRoom,
                         };
                         this.prismaService.prisma.group.create({
                             data: createGroup
@@ -110,47 +112,82 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
         this.createGroup(msg).then(async (res) => {
             if (res) {
                 const chatId = Number(res.tg_group_id);
-                // let textContent = '收到消息';
+                const addMessage: SendMessage = {
+                    chatId: chatId,
+                    content: msg.text(),
+                    msgType: 'text',
+                    fromWxId: msg.fromId,
+                    ext: {
+                        wxMsgId: msg._newMsgId,
+                    }
+                }
                 switch (msg.type()) {
+
                     case wxMsgType.Unknown:
+                        this.logDebug('Unknown message: %s', msg.text())
                         break;
                     case wxMsgType.RedPacket:
+                        parseAppMsgMessagePayload(msg.text()).then(appMsg => {
+                            const titlePrefix = msg._self ? '你发送了一个红包\n' : '收到了一个红包\n'
+                            let title = titlePrefix + (appMsg?.wcpayinfo?.sendertitle ?? '恭喜发财，大吉大利')
+                            const send = (file: Buffer) => {
+                                this.messageService.addMessages({
+                                    ...addMessage,
+                                    content: title,
+                                    msgType: 'redPacket',
+                                    file: file,
+                                }, ClientEnum.TG_BOT)
+                            }
+                            const recshowsourceurl = appMsg?.wcpayinfo?.recshowsourceurl;
+                            const thumburl = appMsg?.thumburl;
+                            if (recshowsourceurl) {
+                                FileUtils.downloadBuffer(recshowsourceurl).then(file => {
+                                    send(file)
+                                })
+                            } else if (thumburl) {
+                                FileUtils.downloadBuffer(thumburl).then(file => {
+                                    send(file)
+                                })
+                            } else {
+                                send(null)
+                            }
+
+                        })
                         break;
                     case wxMsgType.Quote:
                         // TODO 处理引用消息
-                        const quoteMsg = await parseQuoteMsg(msg.text());
-                        LogUtils.debug('Quote message: %s', quoteMsg)
-                        this.messageService.addMessages({
-                            chatId: chatId,
-                            ext: quoteMsg,
-                            msgType: 'quote',
-                        }, ClientEnum.TG_BOT)
+                        parseQuoteMsg(msg.text()).then(quoteMsg => {
+                            LogUtils.debug('Quote message: %s', msg)
+                            this.messageService.addMessages({
+                                ...addMessage,
+                                content: quoteMsg?.title,
+                                ext: quoteMsg,
+                                msgType: 'quote',
+                            }, ClientEnum.TG_BOT)
+                        })
                         break;
                     case wxMsgType.Text:
-                        this.messageService.addMessages({
-                            chatId: chatId,
-                            content: msg.text(),
-                            msgType: 'text',
-                        }, ClientEnum.TG_BOT)
+                        LogUtils.debug('Text message: %s', msg)
+                        this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                         break;
                     // 文件类型的消息
                     case wxMsgType.Image:
                     case wxMsgType.Video:
                     case wxMsgType.Voice:
                     case wxMsgType.File:
-                        msg.toFileBox(msg.type())
-                            .then(fileBox => {
-                                this.messageService.addMessages({
-                                    msgType: 'text',
-                                    chatId: chatId,
-                                    content: '接收文件: ' + fileBox.name,
-                                }, ClientEnum.TG_BOT)
-                                fileBox.toFile(`storage/downloads/${fileBox.name}`)
-                                    .then((res) => {
-                                        // 文件下载好了之后修改消息内容增加文件
-
-                                    })
-                            })
+                        // msg.toFileBox(msg.type())
+                        //     .then(fileBox => {
+                        //         this.messageService.addMessages({
+                        //             msgType: 'text',
+                        //             chatId: chatId,
+                        //             content: '接收文件: ' + fileBox.name,
+                        //         }, ClientEnum.TG_BOT)
+                        //         fileBox.toFile(`storage/downloads/${fileBox.name}`)
+                        //             .then((res) => {
+                        //                 // 文件下载好了之后修改消息内容增加文件
+                        //
+                        //             })
+                        //     })
                         break;
                     case wxMsgType.Emoji:
                         LogUtils.debug('Emoji message: %s', msg.text())

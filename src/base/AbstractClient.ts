@@ -23,7 +23,7 @@ export abstract class AbstractClient<T> implements IClient, IService {
 
     abstract logout(): Promise<boolean>
 
-    abstract sendMessage(msgParams: SendMessage): Promise<object>
+    abstract sendMessage(msgParams: SendMessage): Promise<Record<string, any>>
 
     abstract onMessage(any: any): void
 

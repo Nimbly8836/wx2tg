@@ -76,7 +76,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         return null
     }
 
-    sendMessage(any: any): Promise<object> {
+    sendMessage(any: any): Promise<Record<string, any>> {
         return null
     }
 

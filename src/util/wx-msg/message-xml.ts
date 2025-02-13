@@ -65,12 +65,67 @@ export interface AppMsgXmlSchema {
                     item?: appMsgXmlSchema_mmreader_item []
                 }
             }
+            wcpayinfo?: { // 红包，
+                templateid?: string; // 模板ID
+                url?: string; // 红包链接
+                iconurl?: string; // 图标URL
+                receivertitle?: string; // 接收者标题
+                sendertitle?: string; // 发送者标题
+                scenetext?: string; // 场景文本
+                senderdes?: string; // 发送者描述
+                receiverdes?: string; // 接收者描述
+                nativeurl?: string; // 原生URL
+                sceneid?: string; // 场景ID
+                innertype?: string; // 内部类型
+                paymsgid?: string; // 支付消息ID
+                locallogoicon?: string; // 本地图标
+                invalidtime?: string; // 失效时间
+                senderc2cshowsourceurl?: string; // 发送者C2C展示源URL
+                senderc2cshowsourcemd5?: string; // 发送者C2C展示源MD5
+                receiverc2cshowsourceurl?: string; // 接收者C2C展示源URL
+                receiverc2cshowsourcemd5?: string; // 接收者C2C展示源MD5
+                recshowsourceurl?: string; // 接收展示源URL
+                recshowsourcemd5?: string; // 接收展示源MD5
+                detailshowsourceurl?: string; // 详情展示源URL
+                detailshowsourcemd5?: string; // 详情展示源MD5
+                corpname?: string; // 公司名称
+                coverinfo?: string; // 封面信息
+                broaden?: string; // 扩展字段
+            }
         };
         fromusername: string;
         appinfo: {
             appname: any;
         };
     };
+}
+
+export interface WCPayInfo {
+    templateid?: string; // 模板ID
+    url?: string; // 红包链接
+    iconurl?: string; // 图标URL
+    receivertitle?: string; // 接收者标题
+    sendertitle?: string; // 发送者标题
+    scenetext?: string; // 场景文本
+    senderdes?: string; // 发送者描述
+    receiverdes?: string; // 接收者描述
+    nativeurl?: string; // 原生URL
+    sceneid?: string; // 场景ID
+    innertype?: string; // 内部类型
+    paymsgid?: string; // 支付消息ID
+    locallogoicon?: string; // 本地图标
+    invalidtime?: string; // 失效时间
+    senderc2cshowsourceurl?: string; // 发送者C2C展示源URL
+    senderc2cshowsourcemd5?: string; // 发送者C2C展示源MD5
+    receiverc2cshowsourceurl?: string; // 接收者C2C展示源URL
+    receiverc2cshowsourcemd5?: string; // 接收者C2C展示源MD5
+    recshowsourceurl?: string; // 接收展示源URL
+    recshowsourcemd5?: string; // 接收展示源MD5
+    detailshowsourceurl?: string; // 详情展示源URL
+    detailshowsourcemd5?: string; // 详情展示源MD5
+    corpname?: string; // 公司名称
+    coverinfo?: string; // 封面信息
+    broaden?: string; // 扩展字段
 }
 
 export interface AppAttachPayload {
@@ -143,6 +198,7 @@ export interface AppMessagePayload {
     recorditem?: string;
     refermsg?: ReferMsgPayload;
     items?: appMsgXmlSchema_mmreader_item [];
+    wcpayinfo?: WCPayInfo;
 }
 
 export interface appMsgXmlSchema_mmreader_item {

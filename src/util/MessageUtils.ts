@@ -3,7 +3,7 @@ import {
     AppMessagePayload,
     AppMsgXmlSchema,
     ChannelsMsgPayload,
-    MiniAppMsgPayload
+    MiniAppMsgPayload, WCPayInfo
 } from "./wx-msg/message-xml";
 import {parseString} from 'xml2js'
 import {LogUtils} from "./LogUtils";
@@ -33,6 +33,7 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
             let appattach: AppAttachPayload | undefined
             let channel: ChannelsMsgPayload | undefined
             let miniApp: MiniAppMsgPayload | undefined
+            let wcpayinfo: WCPayInfo | undefined
             const tmp = appMsgXml.msg.appmsg.appattach
             const channeltmp = appMsgXml.msg.appmsg.finderFeed
             const minitmp = appMsgXml.msg.appmsg.weappinfo
@@ -74,6 +75,10 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
                 }
             }
 
+            if (appMsgXml.msg?.appmsg?.wcpayinfo) {
+                wcpayinfo = appMsgXml.msg.appmsg.wcpayinfo
+            }
+
             resolve({
                 appattach,
                 channel,
@@ -87,6 +92,7 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
                 type: parseInt(type, 10),
                 url,
                 items: mmreader?.category?.item,
+                wcpayinfo
             })
         })
     })

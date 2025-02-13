@@ -5,6 +5,7 @@ import {ClientEnum} from "../constant/ClientConstants";
 import IClient from "../base/IClient";
 import {SimpleClientFactory} from "../base/Factory";
 import {LogUtils} from "../util/LogUtils";
+import PrismaService from "./PrismaService";
 
 export class MessageService extends Singleton<MessageService> {
     public static readonly snowflake = new Snowflake();
@@ -14,6 +15,8 @@ export class MessageService extends Singleton<MessageService> {
     private clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
 
     private loopTime = 503
+
+    private prismaService = PrismaService.getInstance(PrismaService)
 
     constructor() {
         super();
@@ -53,10 +56,27 @@ export class MessageService extends Singleton<MessageService> {
             if (!sendMessage?.success && !sendMessage?.isSending) {
                 sendMessage.isSending = true
                 const client = this.clients.get(sendMessage.client)
-                const send = client.sendMessage(sendMessage).then(() => {
+                const send = client.sendMessage(sendMessage).then(async resMsg => {
                     sendMessage.success = true
                     sendMessage.isSending = false
-                    // TODO: save message to db
+                    this.prismaService.prisma.message.create({
+                        data: {
+                            from_wx_id: sendMessage.fromWxId,
+                            content: sendMessage.content,
+                            tg_msg_id: resMsg?.message_id,
+                            wx_msg_id: sendMessage.ext?.wxMsgId,
+                            group: {
+                                connect: {
+                                    tg_group_id: sendMessage.chatId,
+                                }
+                            }
+                        }
+                    }).then(() => {
+                        LogUtils.debug('Message saved')
+                    }).catch(e => {
+                        LogUtils.error('Failed to save message', e, sendMessage)
+                    })
+                    // await saveMsg
                 }).catch(async e => {
                     LogUtils.error('Failed to send message', e)
                 })

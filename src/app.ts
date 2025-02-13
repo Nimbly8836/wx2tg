@@ -20,12 +20,13 @@ process.exit = (code) => {
     if (code === 1) {
         LogUtils.error("gewechaty exit with code 1");
         // 删除 ds.json 文件
-        if (fs.existsSync('ds.json')) {
-            fs.unlinkSync('ds.json');
-        }
+        // if (fs.existsSync('ds.json')) {
+        //     fs.unlinkSync('ds.json');
+        // }
         botClient.sendMessage({
             msgType: 'text',
-            content: '微信客户端出现异常，已退出，请手动退出iPad微信客户端并且重启服务',
+            content: '微信客户端出现异常，已退出。\n' +
+                '如果无法连接，请使用 rmds 命令删除 ds.json 文件并且手动退出 iPad 客户端后重试',
         })
 
     } else {

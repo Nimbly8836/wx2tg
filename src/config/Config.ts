@@ -13,6 +13,7 @@ export const ConfigEnv = {
         username: process.env.PROXY_USERNAME,
         password: process.env.PROXY_PASSWORD,
         hasProxy: !!(process.env.PROXY_HOST && process.env.PROXY_PORT),
+        link: process.env.PROXY_TYPE + '://' + process.env.PROXY_HOST + ':' + process.env.PROXY_PORT
     } as ProxyOptions,
     BASE_API: process.env.BASE_API || '',
     FILE_API: process.env.FILE_API || '',
@@ -26,8 +27,7 @@ export type ProxyOptions = {
     password?: string,
     type: string,
     hasProxy?: boolean,
+    link?: string
 }
 
-export type SettingOptions = {
-
-}
+export type SettingOptions = {}

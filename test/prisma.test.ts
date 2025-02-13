@@ -45,4 +45,19 @@ describe('example test with Prisma Client', () => {
         })
     })
 
+    test('create message', async () => {
+       prisma.message.create({
+            data: {
+                from_wx_id: 'wx123',
+                content: 'hello world',
+                // group_id: 2
+                group: {
+                    connect: {
+                        tg_group_id: -4550149738
+                    }
+                }
+            }
+        }).then()
+    })
+
 })

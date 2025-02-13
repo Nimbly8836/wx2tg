@@ -118,7 +118,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
         throw new Error("Method not implemented.");
     }
 
-    sendMessage(msgParams: SendMessage): Promise<object> {
+    sendMessage(msgParams: SendMessage): Promise<Record<string, any>> {
         throw new Error("Method not implemented.");
     }
 

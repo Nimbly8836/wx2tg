@@ -7,7 +7,7 @@ export default interface IClient {
 
     logout(): Promise<boolean>
 
-    sendMessage(msg: SendMessage): Promise<object>
+    sendMessage(msg: SendMessage): Promise<Record<string, any>>
 
     onMessage(any: any): void
 
