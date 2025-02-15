@@ -6,7 +6,7 @@ import ConfigCheck from "./util/ConfigCheck";
 
 
 try {
-    ConfigCheck.check()
+    ConfigCheck.    check()
 } catch (e) {
     LogUtils.error(e)
     process.exit(2)

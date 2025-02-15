@@ -11,7 +11,11 @@ import {LogUtils} from "../util/LogUtils";
 import {parseAppMsgMessagePayload, parseQuoteMsg} from "../util/MessageUtils";
 import {SendMessage} from "../base/IMessage";
 import FileUtils from "../util/FileUtils";
-import {Settings} from "../entity/Config";
+import {JsonObject} from "@prisma/client/runtime/client";
+import {SettingType} from "../util/SettingUtils";
+import {CustomFile} from "telegram/client/uploads";
+import {addToFolder, createGroupWithHeadImg} from "./UserClientHelper";
+// import {Settings} from "../util/SettingUtils";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
@@ -102,22 +106,9 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                             enabled: false,
                                         })
                                     );
-
-                                    LogUtils.info('createGroup result : %s', JSON.stringify(result.toJSON()))
-                                    // @ts-ignore
-                                    // const groupId = channelId;
-                                    const createGroup = {
-                                        wx_id: wxId,
-                                        tg_group_id: Number(-100 + channelId.toString()),
-                                        group_name: title,
-                                        is_wx_room: msg.isRoom,
-                                    };
-                                    this.prismaService.prisma.group.create({
-                                        data: createGroup
-                                    }).then((res) => {
-                                        this.addToFolder(Number(res.tg_group_id))
-                                        resolve(res)
-                                    })
+                                    LogUtils.debug('createGroup result : %s', JSON.stringify(result.toJSON()))
+                                    const tgGroupId = Number(-100 + channelId.toString());
+                                    createGroupWithHeadImg(msg, title, tgGroupId, resolve)
                                 } else {
                                     LogUtils.error('升级群组设置权限错误')
                                 }
@@ -126,8 +117,58 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         })
                     })
                 } else {
-                    // this.addToFolder(Number(existGroup.tg_group_id))
                     resolve(existGroup)
+                    // 检查头像是否需要更新
+                    const query = msg.isRoom ?
+                        this.prismaService.prisma.wx_room.findUnique({
+                            where: {
+                                wx_id_chatroomId: {
+                                    wx_id: msg.wxid,
+                                    chatroomId: msg.roomId,
+                                },
+                            }
+                        }) :
+                        this.prismaService.prisma.wx_contact.findUnique({
+                            where: {
+                                wx_id_userName: {
+                                    wx_id: msg.wxid,
+                                    userName: msg.fromId,
+                                },
+                            }
+                        });
+                    query.then(entity => {
+                        if (entity) {
+                            const updatePhoto = (url: string) => FileUtils.downloadBuffer(url)
+                                .then(file => {
+                                    this.tgUserClient.bot.uploadFile({
+                                        file: new CustomFile('avatar.jpg', file.length, null, file),
+                                        workers: 2,
+                                    }).then(photo => {
+                                        this.tgUserClient.bot.invoke(new Api.channels.EditPhoto({
+                                            channel: Number(existGroup.tg_group_id),
+                                            photo: new Api.InputChatUploadedPhoto({
+                                                file: photo,
+                                            })
+                                        })).then()
+                                    })
+                                })
+                            if (msg.isRoom) {
+                                if (entity.smallHeadImgUrl !== existGroup.headImgUrl) {
+                                    this.prismaService.prisma.group.update({
+                                        where: {id: existGroup.id},
+                                        data: {headImgUrl: entity.smallHeadImgUrl}
+                                    }).then()
+                                    updatePhoto(entity.smallHeadImgUrl)
+                                }
+                            } else if (entity.bigHeadImgUrl !== existGroup.headImgUrl) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: existGroup.id},
+                                    data: {headImgUrl: entity.bigHeadImgUrl}
+                                }).then()
+                                updatePhoto(entity.bigHeadImgUrl)
+                            }
+                        }
+                    })
                 }
             }).catch(e => {
                 reject(e)
@@ -144,9 +185,9 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
         }).then(existMsg => {
             this.prismaService.getConfigByToken().then(config => {
                 if (config.setting) {
-                    const setting = config.setting as Settings
+                    const setting = config.setting as SettingType
                     // 不接收公众号消息
-                    if (!setting.receivePublicMessages && msg.fromId.startsWith('gh_')) {
+                    if (setting.blockPublicMessages && msg.fromId.startsWith('gh_')) {
                         return
                     }
                 }
@@ -164,7 +205,6 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                 }
                             }
                             switch (msg.type()) {
-
                                 case wxMsgType.Unknown:
                                     this.logDebug('Unknown message: %s', msg.text())
                                     break;
@@ -232,9 +272,11 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                     break;
                                 // 文件类型的消息
                                 case wxMsgType.Image:
+
                                 case wxMsgType.Video:
                                 case wxMsgType.Voice:
                                 case wxMsgType.File:
+                                    LogUtils.debug('File message: %s', msg.text())
                                     // msg.toFileBox(msg.type())
                                     //     .then(fileBox => {
                                     //         this.messageService.addMessages({
@@ -264,39 +306,4 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
             })
         })
     }
-
-    async addToFolder(chatId: number): Promise<void> {
-        this.tgUserClient.bot?.invoke(new Api.messages.GetDialogFilters()).then(result => {
-            const dialogFilter: Api.TypeDialogFilter = result?.filters.find(it => {
-                return it instanceof Api.DialogFilter && it.title === TgClient.DIALOG_TITLE
-            })
-
-            this.tgUserClient.bot?.getInputEntity(chatId).then(entity => {
-                if (entity && dialogFilter instanceof Api.DialogFilter) {
-                    const exist = dialogFilter.includePeers.find(it => {
-                        if (it instanceof Api.InputPeerChat && entity instanceof Api.InputPeerChat) {
-                            return it.chatId === entity.chatId
-                        }
-                        if (it instanceof Api.InputPeerChannel && entity instanceof Api.InputPeerChannel) {
-                            return it.channelId === entity.channelId
-                        }
-                    })
-                    if (!exist) {
-                        dialogFilter.includePeers.push(entity)
-                        this.tgUserClient.bot?.invoke(new Api.messages.UpdateDialogFilter({
-                            id: dialogFilter.id,
-                            filter: dialogFilter,
-                        })).catch(e => {
-                            LogUtils.warn('添加到文件夹失败: %s', e)
-                        })
-                    }
-                }
-            })
-
-        })
-
-
-    }
-
-
 }

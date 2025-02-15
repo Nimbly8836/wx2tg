@@ -1,4 +1,4 @@
-import {Telegraf} from "telegraf";
+import {Markup, Telegraf} from "telegraf";
 import {AbstractService, Singleton} from "../base/IService";
 import {SendMessage} from "../base/IMessage";
 import {MessageService} from "./MessageService";
@@ -14,7 +14,7 @@ import * as fs from "node:fs";
 import {message} from "telegraf/filters";
 import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
-import {Settings} from "../entity/Config";
+import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -29,6 +29,7 @@ export default class BotHelper extends Singleton<BotHelper> {
             {command: 'help', description: '帮助'},
             {command: 'start', description: '开始'},
             {command: 'login', description: '登录'},
+            {command: 'setting', description: '设置'},
             {command: 'user', description: '查看联系人，支持昵称、备注、全缩写大写、小写全拼查询'},
             {command: 'room', description: '查看群组，支持昵称和备注查询'},
             {command: 'sc', description: '搜索聊天记录内容'},
@@ -97,10 +98,7 @@ export default class BotHelper extends Singleton<BotHelper> {
                                 bot_chat_id: ctx.chat.id,
                                 bot_token: ConfigEnv.BOT_TOKEN,
                                 login_wxid: '',
-                                setting: {
-                                    receivePublicMessages: false,
-                                    blockStickers: false,
-                                } as Settings
+                                setting: defaultSetting
                             }
                         }).then(() => {
                             TgClient.getInstance().login().then(r => {
@@ -117,10 +115,7 @@ export default class BotHelper extends Singleton<BotHelper> {
                             config.update({
                                 where: {id: r.id},
                                 data: {
-                                    setting: {
-                                        receivePublicMessages: false,
-                                        blockStickers: false,
-                                    } as Settings
+                                    setting: defaultSetting
                                 }
                             }).then()
                         }
@@ -150,6 +145,8 @@ export default class BotHelper extends Singleton<BotHelper> {
             ctx.reply('成功')
         })
 
+
+        this.setting(bot)
         this.user(bot)
         this.room(bot)
         this.sc(bot)
@@ -183,6 +180,55 @@ export default class BotHelper extends Singleton<BotHelper> {
                 }
 
             })
+        })
+
+    }
+
+    // 完成 Bot 设置部分
+    private setting(bot: Telegraf) {
+        bot.settings(ctx => {
+            // 获取数据库中的设置数据
+            this.prismaService.getConfigByToken().then(config => {
+                const settings = config.setting as SettingType
+
+                const buttons = getButtons(settings);
+
+                ctx.sendMessage('设置：', {
+                    reply_markup: {
+                        inline_keyboard: buttons,
+                    },
+                });
+            }).catch((err) => {
+                LogUtils.error("Failed to get config by token", err);
+            });
+        });
+
+        // 监听设置按钮
+
+        bot.action(/^setting:(.*)$/, async (ctx) => {
+            const settingKey = ctx.match[1];
+            this.prismaService.getConfigByToken().then(async config => {
+                const settings = config.setting as SettingType;
+
+                // 切换设置
+                settings[settingKey] = !settings[settingKey];
+
+                // 更新数据库
+                this.prismaService.config().update({
+                    where: {id: config.id},
+                    data: {setting: settings}
+                }).then()
+
+                // 更新按钮
+                const buttons = getButtons(settings);
+
+                ctx.editMessageReplyMarkup({
+                    inline_keyboard: buttons,
+                });
+
+                ctx.answerCbQuery();
+            })
+
         })
 
     }
@@ -330,5 +376,9 @@ export default class BotHelper extends Singleton<BotHelper> {
             ctx.reply(`你点击了chatroomId = ${chatroomId}`)
             ctx.answerCbQuery()
         })
+    }
+
+    private onAction(bot: Telegraf) {
+
     }
 }

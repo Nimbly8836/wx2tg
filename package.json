@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "NODE_ENV=pro tsc && node dist/app.js",
+    "start": "LOG_LEVEL=pro tsc && node dist/app.js",
     "init-db": "prisma migrate dev --name init"
   },
   "keywords": [
@@ -25,7 +25,7 @@
     "dotenv": "^16.0.3",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "gewechaty": "https://github.com/Nimbly8836/gewechaty/releases/download/v0.0.24/gewechaty-0.0.24.tgz",
+    "gewechaty": "https://github.com/Nimbly8836/gewechaty/releases/download/v0.0.25/gewechaty-0.0.24.tgz",
     "https-proxy-agent": "^7.0.4",
     "jsdom": "^24.1.0",
     "log4js": "^6.9.1",
@@ -43,7 +43,8 @@
     "tencentcloud-sdk-nodejs": "^4.0.977",
     "ts-md5": "^1.3.1",
     "ts-node": "^10.9.1",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "wechaty-puppet-wechat4u": "https://github.com/finalpi/puppet-wechat4file/releases/download/1.14.28/wechaty-puppet-wechat4u-1.14.28.tgz"
   },
   "devDependencies": {
     "@types/jest": "29.5.14",

@@ -59,6 +59,11 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             this.bot.connect().then(async () => {
                 const b = await this.bot.checkAuthorization();
                 if (b) {
+                    prisma.config().updateMany({
+                        where: {bot_token: ConfigEnv.BOT_TOKEN},
+                        data: {tg_login: true}
+                    }).then()
+                    this.hasLogin = true
                     resolve(true)
                     return
                 }

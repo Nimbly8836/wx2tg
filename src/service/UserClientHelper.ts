@@ -1,0 +1,105 @@
+// 新的公共函数
+import FileUtils from "../util/FileUtils";
+import {CustomFile} from "telegram/client/uploads";
+import {Api} from "telegram";
+import {Message} from "gewechaty";
+import {LogUtils} from "../util/LogUtils";
+import PrismaService from "./PrismaService";
+import WxMessageHelper from "./WxMessageHelper";
+import TgClient from "../client/TgClient";
+
+export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, resolve: Function) {
+    // 选择查询表格
+    const prismaService = PrismaService.getInstance(PrismaService);
+    const tgUserClient = TgClient.getInstance();
+    const query = wxMsg.isRoom ?
+        prismaService.prisma.wx_room.findUnique({
+            where: {
+                wx_id_chatroomId: {
+                    wx_id: wxMsg.wxid,
+                    chatroomId: wxMsg.roomId,
+                },
+            }
+        }) :
+        prismaService.prisma.wx_contact.findUnique({
+            where: {
+                wx_id_userName: {
+                    wx_id: wxMsg.wxid,
+                    userName: wxMsg.fromId,
+                },
+            }
+        });
+
+    const createGroup = {
+        wx_id: wxMsg.wxid,
+        tg_group_id: channelId,
+        group_name: title,
+        is_wx_room: wxMsg.isRoom,
+    };
+
+    query.then(entity => {
+        // 创建群组
+        prismaService.prisma.group.create({
+            data: {
+                ...createGroup,
+                headImgUrl: wxMsg.isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl,
+            }
+        }).then((res) => {
+            // 将群组添加到文件夹
+            addToFolder(Number(res.tg_group_id)).then(() => {
+                // 检查并上传头像
+                const headImgUrl = wxMsg.isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl;
+                if (headImgUrl) {
+                    FileUtils.downloadBuffer(headImgUrl).then(file => {
+                        tgUserClient.bot.uploadFile({
+                            file: new CustomFile('avatar.jpg', file.length, null, file),
+                            workers: 2,
+                        }).then(photo => {
+                            tgUserClient.bot.invoke(new Api.channels.EditPhoto({
+                                channel: channelId,
+                                photo: new Api.InputChatUploadedPhoto({
+                                    file: photo,
+                                })
+                            })).then()
+                        })
+                    })
+                }
+            })
+            resolve(res);
+        })
+    }).catch(err => {
+        LogUtils.error('Error in creating group or fetching entity:', err);
+    });
+}
+
+export async function addToFolder(chatId: number) {
+    const tgUserClient = TgClient.getInstance();
+    tgUserClient.bot?.invoke(new Api.messages.GetDialogFilters()).then(result => {
+        const dialogFilter: Api.TypeDialogFilter = result?.filters.find(it => {
+            return it instanceof Api.DialogFilter && it.title === TgClient.DIALOG_TITLE
+        })
+
+        tgUserClient.bot?.getInputEntity(chatId).then(entity => {
+            if (entity && dialogFilter instanceof Api.DialogFilter) {
+                const exist = dialogFilter.includePeers.find(it => {
+                    if (it instanceof Api.InputPeerChat && entity instanceof Api.InputPeerChat) {
+                        return it.chatId === entity.chatId
+                    }
+                    if (it instanceof Api.InputPeerChannel && entity instanceof Api.InputPeerChannel) {
+                        return it.channelId === entity.channelId
+                    }
+                })
+                if (!exist) {
+                    dialogFilter.includePeers.push(entity)
+                    tgUserClient.bot?.invoke(new Api.messages.UpdateDialogFilter({
+                        id: dialogFilter.id,
+                        filter: dialogFilter,
+                    })).catch(e => {
+                        LogUtils.warn('添加到文件夹失败: %s', e)
+                    })
+                }
+            }
+        })
+
+    })
+}

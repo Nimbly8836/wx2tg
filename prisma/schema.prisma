@@ -31,6 +31,7 @@ model group {
   is_wx_room  Boolean?  @default(false) @db.Boolean
   create_at   DateTime? @default(now()) @db.Timestamptz(6)
   modify_at   DateTime? @default(now()) @db.Timestamptz(6)
+  headImgUrl  String?   @db.VarChar
   message     message[]
 }
 

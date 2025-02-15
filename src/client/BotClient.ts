@@ -8,6 +8,7 @@ import PrismaService from "../service/PrismaService";
 import TgClient from "./TgClient";
 import {WxClient} from "./WxClient";
 import {LogUtils} from "../util/LogUtils";
+import {defaultSetting} from "../util/SettingUtils";
 
 export default class BotClient extends AbstractClient<Telegraf> {
 
@@ -47,17 +48,29 @@ export default class BotClient extends AbstractClient<Telegraf> {
             this.initBot()
             this.bot.launch(() => {
                 this.hasLogin = true
-                resolve(true)
-            }).then(() => {
-                PrismaService.getInstance(PrismaService).getConfigByToken().then(config => {
+
+                const prismaService = PrismaService.getInstance(PrismaService);
+                prismaService.getConfigByToken().then(config => {
                     if (!config.tg_login) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请先输入 /start，然后按照提示登录 Telegram`)
                     }
                     if (!config.login_wxid) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请使用命令 /login 登录微信`)
                     }
+                    if (!config.setting) {
+                        prismaService.config().update({
+                            where: {id: config.id},
+                            data: {
+                                setting: defaultSetting
+                            }
+                        }).then()
+                    }
                     resolve(true)
                 })
+
+
+            }).then(() => {
+
             }).catch((e) => {
                 this.hasLogin = false
                 reject(e)
