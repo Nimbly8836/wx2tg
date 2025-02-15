@@ -2,8 +2,15 @@ import {LogUtils} from "./util/LogUtils";
 import {SimpleClientFactory} from "./base/Factory";
 import {ClientEnum} from "./constant/ClientConstants";
 import BotClient from "./client/BotClient";
-import * as fs from "node:fs";
+import ConfigCheck from "./util/ConfigCheck";
 
+
+try {
+    ConfigCheck.check()
+} catch (e) {
+    LogUtils.error(e)
+    process.exit(2)
+}
 let botClient = SimpleClientFactory.getSingletonClient(ClientEnum.TG_BOT) as BotClient;
 botClient.start().then(() => {
     LogUtils.info('start success...')

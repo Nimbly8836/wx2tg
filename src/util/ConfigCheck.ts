@@ -46,5 +46,5 @@ export default class ConfigCheck {
         });
     }
 }
-const requiredEnvVariables: string[] = ['BOT_TOKEN', 'API_ID', 'API_HASH'];
+const requiredEnvVariables: string[] = ['BOT_TOKEN', 'API_ID', 'API_HASH', 'DATABASE_URL', 'OWNER_ID', 'BASE_API', 'FILE_API'];
 

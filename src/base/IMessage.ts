@@ -11,6 +11,8 @@ export type SendMessage = {
     },
     chatId?: number,
     fromWxId?: string,
+    parentId?: number,
+    replyId?: number,
 }
 
 export type SendingMessage = SendMessage & {

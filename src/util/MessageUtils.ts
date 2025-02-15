@@ -108,6 +108,7 @@ export async function parseQuoteMsg(quoteMsg: string): Promise<any> {
                     resolve({
                         title: appMsgPayload.title,
                         referMsg_title: referAppMsg,
+                        parentId: appMsgPayload.refermsg?.svrid
                     })
                 } else {
                     parseAppMsgMessagePayload(referAppMsg)
@@ -115,6 +116,7 @@ export async function parseQuoteMsg(quoteMsg: string): Promise<any> {
                             resolve({
                                 title: appMsgPayload.title,
                                 referMsg_title: referMsgPayload.title,
+                                parentId: appMsgPayload.refermsg?.svrid
                             })
                         })
                 }

@@ -6,6 +6,7 @@ export const ConfigEnv = {
     BOT_TOKEN: process.env.BOT_TOKEN || '',
     API_ID: Number(process.env.API_ID),
     API_HASH: process.env.API_HASH || '',
+    OWNER_ID: Number(process.env.OWNER_ID),
     PROXY_CONFIG: {
         type: process.env.PROXY_TYPE,
         host: process.env.PROXY_HOST,

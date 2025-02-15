@@ -3,6 +3,7 @@ import {ConfigEnv} from "../config/Config";
 import {Database} from "sqlite3";
 import {WxConcat, WxRoom} from "../entity/WeChatSqlite";
 import {PrismaClient} from "@prisma/client";
+import {Constants} from "../constant/Constants";
 
 
 export default class PrismaService extends Singleton<PrismaService> {
@@ -35,7 +36,7 @@ export default class PrismaService extends Singleton<PrismaService> {
 
 
     public async createOrUpdateWxConcatAndRoom(wxid: string) {
-        const sqliteDatabase = new Database(`${wxid}.db`)
+        const sqliteDatabase = new Database(`${Constants.GEWE_PATH}/${wxid}.db`)
         sqliteDatabase.all<WxConcat>('SELECT * FROM contact', (err, rows) => {
             if (rows) {
                 this.prisma.wx_contact.createManyAndReturn({
@@ -132,6 +133,74 @@ export default class PrismaService extends Singleton<PrismaService> {
             })
         } else {
             return this.prisma.wx_contact.count()
+        }
+    }
+
+    public async pageWxRoom(queryName: string, take: number | 10, skip: number | 0) {
+        if (queryName) {
+            return this.prisma.wx_room.findMany({
+                where: {
+                    OR: [
+                        {nickName: {contains: queryName}},
+                        {pyInitial: {contains: queryName}},
+                        {quanPin: {contains: queryName}},
+                        {remark: {contains: queryName}},
+                        {remarkPyInitial: {contains: queryName}},
+                        {remarkQuanPin: {contains: queryName}},
+                    ]
+                },
+                take: take,
+                skip: skip
+            })
+        } else {
+            return this.prisma.wx_room.findMany({
+                take: take,
+                skip: skip
+            })
+        }
+    }
+
+    public async countWxRoom(queryName: string) {
+        if (queryName) {
+            return this.prisma.wx_room.count({
+                where: {
+                    OR: [
+                        {nickName: {contains: queryName}},
+                        {pyInitial: {contains: queryName}},
+                        {quanPin: {contains: queryName}},
+                        {remark: {contains: queryName}},
+                        {remarkPyInitial: {contains: queryName}},
+                        {remarkQuanPin: {contains: queryName}},
+                    ],
+                },
+            })
+        } else {
+            return this.prisma.wx_room.count()
+        }
+    }
+
+    public async pageMessageContent(contentText: string, take: number | 10, skip: number | 0) {
+        if (contentText) {
+            return this.prisma.message.findMany({
+                where: {
+                    content: {contains: contentText}
+                },
+                include: {
+                    group: true
+                },
+                take: take,
+                skip: skip
+            })
+        }
+    }
+
+    public async countMessageContent(contentText: string) {
+        if (contentText) {
+            return this.prisma.message.count({
+                where: {
+                    content: {contains: contentText}
+                }
+            })
         }
     }
 }

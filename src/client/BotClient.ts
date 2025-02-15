@@ -7,6 +7,7 @@ import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import PrismaService from "../service/PrismaService";
 import TgClient from "./TgClient";
 import {WxClient} from "./WxClient";
+import {LogUtils} from "../util/LogUtils";
 
 export default class BotClient extends AbstractClient<Telegraf> {
 
@@ -59,7 +60,6 @@ export default class BotClient extends AbstractClient<Telegraf> {
                 })
             }).catch((e) => {
                 this.hasLogin = false
-                this.logError('BotClient start error : %s', e)
                 reject(e)
             })
         })
@@ -79,21 +79,23 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     async sendMessage(msg: SendMessage): Promise<Record<string, any>> {
         // 默认发送到 bot_chat_id
+        const prismaService = PrismaService.getInstance(PrismaService);
         if (!msg.chatId) {
-            msg.chatId = Number((await PrismaService.getInstance(PrismaService).getConfigByToken()).bot_chat_id)
+            msg.chatId = Number((await prismaService.getConfigByToken()).bot_chat_id)
         }
         return new Promise<object>((resolve, reject) => {
             let result = null
             const telegram = this.bot.telegram;
             switch (msg.msgType) {
                 case "quote":
-                    // TODO 先直接发送原始消息的文本，后续存储了消息之后处理
-                    //  { title: '发送的消息', referMsg_title: '引用的消息' }
-                    let content = `<blockquote>${msg.ext?.referMsg_title}</blockquote>${msg.ext?.title}`
-                    result = telegram.sendMessage(msg.chatId,
-                        content, {
-                            parse_mode: 'HTML',
-                        })
+                    const content = msg.parentId ? msg.ext?.title
+                        : `<blockquote>${msg.ext?.referMsg_title}</blockquote>&#10;${msg.ext?.title}`
+                    result = telegram.sendMessage(msg.chatId, content, {
+                        parse_mode: 'HTML',
+                        reply_parameters: msg.parentId ? {
+                            message_id: msg.replyId
+                        } : undefined
+                    })
                     break;
                 case "text":
                     result = telegram.sendMessage(msg.chatId, msg.content, msg.ext)
@@ -139,6 +141,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
     private initBot(): void {
         // 设置命令
         const botHelper = BotHelper.getInstance(BotHelper);
+        botHelper.filterOwner(this.bot)
         botHelper.setCommands(this.bot)
         botHelper.onCommand(this.bot)
         this.bot.catch((err, ctx: Context) => {

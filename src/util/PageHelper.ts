@@ -20,6 +20,7 @@ export interface PaginationHandler<T> {
     fetchData: (pageNo: number, pageSize: number, queryParams?: Record<string, any>) => Promise<PagedResult<T>>
     renderButton: (item: T, index: number, pageNo: number, pageSize: number) => {
         text: string,
+        url?: string,
         callbackData: string
     }
 }
@@ -37,6 +38,7 @@ export function registerPagination<T>(
     fetchData: (pageNo: number, pageSize: number, queryParams?: Record<string, any>) => Promise<PagedResult<T>>,
     renderButton: (item: T, index: number, pageNo: number, pageSize: number) => {
         text: string,
+        url?: string,
         callbackData: string
     }
 ) {
@@ -76,10 +78,17 @@ export async function sendPagedList<T>(
     }
     text += `当前页: ${pageNo}, 每页: ${pageSize}, 总数: ${page.total}\n\n`
 
-    // renderButton 会返回 { text: string, callbackData: string }
+    // 根据 renderButton 返回值判断是否生成 url 按钮或回调按钮
     const itemButtons = page.data.map((item, index) => {
-        const {text: btnText, callbackData} = renderButton(item, index, pageNo, pageSize)
-        return Markup.button.callback(btnText, callbackData)
+        const {text: btnText, callbackData, url} = renderButton(item, index, pageNo, pageSize)
+
+        if (url) {
+            // 如果有url，使用 url 类型的按钮
+            return Markup.button.url(btnText, url)
+        } else {
+            // 如果没有 url，使用 callback 类型的按钮
+            return Markup.button.callback(btnText, callbackData)
+        }
     })
 
     const chunkedItemButtons = chunkArray(itemButtons, columns)
@@ -95,16 +104,20 @@ export async function sendPagedList<T>(
             Markup.button.callback('下一页', `paging:${queryKey}:${pageNo + 1}:${pageSize}:${columns}`)
         )
     }
+
     // 如果有上一页或下一页按钮，则再加一行
     if (paginationButtons.length > 0) {
         chunkedItemButtons.push(paginationButtons)
     }
 
-    await ctx.reply(
+    ctx.reply(
         text,
         Markup.inlineKeyboard(chunkedItemButtons)
-    )
+    ).catch((err) => {
+        LogUtils.error(err)
+    })
 }
+
 
 /**
  * 初始化通用分页回调：拦截 paging:xx:xx:xx:xx 的回调，执行翻页
