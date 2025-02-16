@@ -5,3 +5,13 @@ export type Contact = {
     showName: string,
     avatar: string,
 }
+
+export type RoomMemberType = {
+    "wxid": string,
+    "nickName": string,
+    "inviterUserName": string,
+    "memberFlag": number,
+    "displayName": string,
+    "bigHeadImgUrl": string,
+    "smallHeadImgUrl": string,
+}

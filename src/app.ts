@@ -3,10 +3,11 @@ import {SimpleClientFactory} from "./base/Factory";
 import {ClientEnum} from "./constant/ClientConstants";
 import BotClient from "./client/BotClient";
 import ConfigCheck from "./util/ConfigCheck";
+import {WxClient} from "./client/WxClient";
 
 
 try {
-    ConfigCheck.    check()
+    ConfigCheck.check()
 } catch (e) {
     LogUtils.error(e)
     process.exit(2)
@@ -17,7 +18,7 @@ botClient.start().then(() => {
 })
 
 process.on('uncaughtException', (err) => {
-    LogUtils.error('wechat2Tg uncaughtException', err)
+    LogUtils.error('wx2Tg uncaughtException', err)
 })
 
 const originalExit = process.exit;
@@ -25,15 +26,17 @@ const originalExit = process.exit;
 // @ts-ignore
 process.exit = (code) => {
     if (code === 1) {
-        LogUtils.error("gewechaty exit with code 1");
-        // 删除 ds.json 文件
-        // if (fs.existsSync('ds.json')) {
-        //     fs.unlinkSync('ds.json');
-        // }
-        botClient.sendMessage({
-            msgType: 'text',
-            content: '微信客户端出现异常，已退出。\n' +
-                '如果无法连接，请使用 rmds 命令删除 ds.json 文件并且手动退出 iPad 客户端后重试',
+
+        WxClient.getInstance().check().then(check => {
+            if (!check) {
+                botClient.sendMessage({
+                    msgType: 'text',
+                    content: '微信客户端出现异常，可能丢失消息。\n' +
+                        '可以使用 /check 查看微信是否在线 \n' +
+                        '如果连接异常，可以使用 /rmds （删除缓存）和 /logout 后重试',
+                }).then()
+            }
+            LogUtils.error('gewechat process.exit code 1')
         })
 
     } else {

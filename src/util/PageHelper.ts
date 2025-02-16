@@ -22,7 +22,8 @@ export interface PaginationHandler<T> {
         text: string,
         url?: string,
         callbackData: string
-    }
+    },
+    editMsg?: boolean
 }
 
 /**
@@ -40,11 +41,13 @@ export function registerPagination<T>(
         text: string,
         url?: string,
         callbackData: string
-    }
+    },
+    editMsg?: boolean
 ) {
     paginationMap[queryKey] = {
         fetchData,
         renderButton,
+        editMsg,
     }
 }
 
@@ -59,7 +62,7 @@ export async function sendPagedList<T>(
     ctx: Context,
     queryKey: string,
     pageParam: PageParam,
-    extraMessage?: Record<string, any>
+    extraMessage?: Record<string, any>,
 ) {
     const handler = paginationMap[queryKey]
     if (!handler) {
@@ -69,53 +72,71 @@ export async function sendPagedList<T>(
 
     const {pageNo, pageSize, columns} = pageParam
 
-    const {fetchData, renderButton} = handler
-    const page = await fetchData(pageNo, pageSize, extraMessage)
+    const {fetchData, renderButton, editMsg} = handler
 
-    let text = ''
-    if (extraMessage?.keyword) {
-        text += `搜索关键词: ${extraMessage.keyword}\n`
-    }
-    text += `当前页: ${pageNo}, 每页: ${pageSize}, 总数: ${page.total}\n\n`
+    return new Promise(resolve => {
+        fetchData(pageNo, pageSize, extraMessage).then((page) => {
+                let text = ''
+                if (extraMessage?.keyword) {
+                    text += `搜索关键词: ${extraMessage.keyword}\n`
+                }
+                text += `当前页: ${pageNo}, 每页: ${pageSize}, 总数: ${page?.total ?? 0}\n\n`
 
-    // 根据 renderButton 返回值判断是否生成 url 按钮或回调按钮
-    const itemButtons = page.data.map((item, index) => {
-        const {text: btnText, callbackData, url} = renderButton(item, index, pageNo, pageSize)
+                // 根据 renderButton 返回值判断是否生成 url 按钮或回调按钮
+                const itemButtons = page.data?.map((item, index) => {
+                    const {text: btnText, callbackData, url} = renderButton(item, index, pageNo, pageSize)
 
-        if (url) {
-            // 如果有url，使用 url 类型的按钮
-            return Markup.button.url(btnText, url)
-        } else {
-            // 如果没有 url，使用 callback 类型的按钮
-            return Markup.button.callback(btnText, callbackData)
-        }
+                    if (url) {
+                        // 如果有url，使用 url 类型的按钮
+                        return Markup.button.url(btnText, url)
+                    } else {
+                        // 如果没有 url，使用 callback 类型的按钮
+                        return Markup.button.callback(btnText, callbackData)
+                    }
+                })
+
+                const chunkedItemButtons = chunkArray(itemButtons, columns)
+
+                const paginationButtons = []
+                if (pageNo > 1) {
+                    paginationButtons.push(
+                        Markup.button.callback('上一页', `paging:${queryKey}:${pageNo - 1}:${pageSize}:${columns}`)
+                    )
+                }
+                if (pageNo * pageSize < page.total) {
+                    paginationButtons.push(
+                        Markup.button.callback('下一页', `paging:${queryKey}:${pageNo + 1}:${pageSize}:${columns}`)
+                    )
+                }
+
+                // 如果有上一页或下一页按钮，则再加一行
+                if (paginationButtons.length > 0) {
+                    chunkedItemButtons.push(paginationButtons)
+                }
+
+                // @ts-ignore
+                if (editMsg && !ctx?.command) {
+                    ctx.editMessageReplyMarkup({
+                        inline_keyboard: chunkedItemButtons
+                    }).then(res => {
+                        resolve(res)
+                    })
+                } else {
+                    ctx.reply(
+                        text,
+                        Markup.inlineKeyboard(chunkedItemButtons)
+                    ).then(res => {
+                        LogUtils.debug('sendPagedList: %s', res)
+                        resolve(res)
+                    }).catch((err) => {
+                        LogUtils.error(err)
+                    })
+                }
+            }
+        )
+
     })
 
-    const chunkedItemButtons = chunkArray(itemButtons, columns)
-
-    const paginationButtons = []
-    if (pageNo > 1) {
-        paginationButtons.push(
-            Markup.button.callback('上一页', `paging:${queryKey}:${pageNo - 1}:${pageSize}:${columns}`)
-        )
-    }
-    if (pageNo * pageSize < page.total) {
-        paginationButtons.push(
-            Markup.button.callback('下一页', `paging:${queryKey}:${pageNo + 1}:${pageSize}:${columns}`)
-        )
-    }
-
-    // 如果有上一页或下一页按钮，则再加一行
-    if (paginationButtons.length > 0) {
-        chunkedItemButtons.push(paginationButtons)
-    }
-
-    ctx.reply(
-        text,
-        Markup.inlineKeyboard(chunkedItemButtons)
-    ).catch((err) => {
-        LogUtils.error(err)
-    })
 }
 
 
@@ -129,18 +150,22 @@ export function initPaginationCallback(bot: Telegraf) {
             const pageNo = parseInt(ctx.match[2], 10)
             const pageSize = parseInt(ctx.match[3], 10)
             const columns = parseInt(ctx.match[4], 10)
+            // const msgId = parseInt(ctx.match[5], 10)
+            // @ts-ignore
+            const extraMsg = ctx.session[queryKey + 'extraData'] || {}
 
-            await sendPagedList(ctx, queryKey, {
+            sendPagedList(ctx, queryKey, {
                 pageNo,
                 pageSize,
-                columns
+                columns,
+            }, {
+                ...extraMsg
+            }).then(() => {
+                ctx.answerCbQuery()
             })
-
-            // 避免按钮一直显示 loading
-            await ctx.answerCbQuery()
         } catch (err) {
             LogUtils.error(err)
-            await ctx.answerCbQuery('分页回调出错')
+            ctx.answerCbQuery('分页回调出错')
         }
     })
 }
@@ -152,7 +177,7 @@ export function initPaginationCallback(bot: Telegraf) {
  */
 function chunkArray<T>(arr: T[], size: number): T[][] {
     const result: T[][] = []
-    for (let i = 0; i < arr.length; i += size) {
+    for (let i = 0; i < arr?.length; i += size) {
         result.push(arr.slice(i, i + size))
     }
     return result

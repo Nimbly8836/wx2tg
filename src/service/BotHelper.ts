@@ -15,10 +15,13 @@ import {message} from "telegraf/filters";
 import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
+import {updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
+import {RoomMemberType} from "../entity/Contact";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
     private prismaService = PrismaService.getInstance(PrismaService);
+    private wxClient = WxClient.getInstance();
 
     constructor() {
         super();
@@ -26,12 +29,18 @@ export default class BotHelper extends Singleton<BotHelper> {
 
     public setCommands(bot: Telegraf): void {
         const commands = [
-            {command: 'help', description: '帮助'},
-            {command: 'start', description: '开始'},
-            {command: 'login', description: '登录'},
+            {command: 'start', description: '开始，登陆 TG User Client'},
+            {command: 'help', description: '帮助信息'},
             {command: 'setting', description: '设置'},
+            {command: 'login', description: '登录微信'},
+            {command: 'logout', description: '登出微信'},
+            {command: 'rmds', description: '删除微信登录的缓存文件'},
             {command: 'user', description: '查看联系人，支持昵称、备注、全缩写大写、小写全拼查询'},
             {command: 'room', description: '查看群组，支持昵称和备注查询'},
+            {command: 'roomml', description: '查看群组成员'},
+            {command: 'sync', description: '同步群组/联系人信息'},
+            {command: 'info', description: '查看当前群信息'},
+            {command: 'check', description: '检查微信是否在线'},
             {command: 'sc', description: '搜索聊天记录内容'},
         ]
 
@@ -145,11 +154,134 @@ export default class BotHelper extends Singleton<BotHelper> {
             ctx.reply('成功')
         })
 
+        bot.command('info', async (ctx) => {
+            this.prismaService.prisma.group.findUnique({
+                where: {
+                    tg_group_id: ctx.chat.id
+                },
+            }).then(g => {
+                if (g?.is_wx_room) {
+                    this.prismaService.prisma.wx_room.findUnique({
+                        where: {id: g.wx_room_id}
+                    }).then(room => {
+                        // const memberList = room.memberList
+                        room.memberList = ''
+                        ctx.reply(`群信息: <pre><code class="language-json">${JSON.stringify(room, null, 2)}</code></pre>
+                                        查看成员使用 /roomml `, {
+                            parse_mode: 'HTML',
+                        })
+                    })
+                } else {
+                    this.prismaService.prisma.wx_contact.findUnique({
+                        where: {id: g?.wx_contact_id}
+                    }).then(contact => {
+                        ctx.reply(`联系人信息：<pre><code class="language-json">${JSON.stringify(contact, null, 2)}</code></pre>`, {
+                            parse_mode: 'HTML'
+                        })
+                    })
+                }
+            })
+        })
+
+        bot.command('sync', async (ctx) => {
+            this.prismaService.prisma.group.findUniqueOrThrow({
+                where: {tg_group_id: ctx.chat.id}
+            }).then((group) => {
+                if (group.is_wx_room) {
+                    // @ts-ignore
+                    this.wxClient.bot.Room.find({id: group.wx_id}).then(findWxRoom => {
+                        findWxRoom.sync().then(syncedRoom => {
+                            LogUtils.debug('syncedRoom', syncedRoom)
+                            this.prismaService.syncRoomDb(syncedRoom.chatroomId)
+                            // 更新头像
+                            if (syncedRoom.avatarImg !== group.headImgUrl) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        headImgUrl: syncedRoom.avatarImg
+                                    }
+                                }).then()
+                                updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
+                                    .then()
+                            }
+                            // 更新名称
+                            if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
+                                    }
+                                }).then()
+                                updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
+                                    .then()
+                            }
+                            ctx.reply('同步成功')
+                        }).catch(e => {
+                            LogUtils.error('syncRoom', e)
+                            ctx.reply('同步失败')
+                        })
+                    })
+
+                } else {
+                    this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
+                        findWxContact.sync().then(syncedContact => {
+                            LogUtils.debug('syncedContact', syncedContact)
+                            // 更新头像
+                            if (syncedContact._avatarUrl !== group.headImgUrl) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        headImgUrl: syncedContact._avatarUrl
+                                    }
+                                }).then()
+                                updateGroupHeadImg(syncedContact._avatarUrl, ctx.chat.id)
+                                    .then()
+                            }
+                            // 更新名称
+                            if (syncedContact._alias !== group.group_name && syncedContact._name !== group.group_name) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        group_name: syncedContact._alias ? syncedContact._alias : syncedContact._name
+                                    }
+                                }).then()
+                                updateGroupTitle(syncedContact._alias ? syncedContact._alias : syncedContact._name, ctx.chat.id)
+                                    .then()
+                            }
+                            this.prismaService.syncContactDb(syncedContact._wxid)
+                        }).catch(e => {
+                            LogUtils.error('syncContact', e)
+                            ctx.reply('同步失败')
+                        })
+                        ctx.reply('同步成功')
+                    })
+                }
+            }).catch(e => {
+                ctx.reply('没绑定当前群组')
+                this.prismaService.createOrUpdateWxConcatAndRoom()
+            })
+        })
+
+        bot.command('logout', async (ctx) => {
+            this.wxClient.logout().then(r => {
+                ctx.reply('微信登出成功')
+            }).catch(e => {
+                LogUtils.error('command logout', e)
+                ctx.reply('微信登出失败')
+            })
+        })
+
+        bot.command('check', ctx => {
+            this.wxClient.check().then(r => {
+                ctx.reply(r ? '微信在线' : '微信离线')
+            })
+        })
 
         this.setting(bot)
         this.user(bot)
         this.room(bot)
         this.sc(bot)
+        this.checkRoomMember(bot)
         // 分页初始化
         initPaginationCallback(bot)
         this.onMessage(bot)
@@ -170,11 +302,11 @@ export default class BotHelper extends Singleton<BotHelper> {
             }).then(r => {
                 if (r?.is_wx_room) {
                     // @ts-ignore
-                    geweBot.Room.find({id: r.wx_id}).then(room => {
+                    geweBot.Room.find({id: r?.wx_id}).then(room => {
                         room.say(text)
                     })
                 } else {
-                    geweBot.Contact.find({id: r.wx_id}).then(contact => {
+                    geweBot.Contact.find({id: r?.wx_id}).then(contact => {
                         contact.say(text)
                     })
                 }
@@ -243,10 +375,21 @@ export default class BotHelper extends Singleton<BotHelper> {
             const take = pageSize
             const keyword = queryParams?.keyword || ''
 
-            const total = await this.prismaService.countWxContact(keyword)
-            const data = await this.prismaService.pageWxContact(keyword, take, skip)
+            return new Promise(async resolve => {
+                this.prismaService.countWxContact(keyword).then(total => {
+                    this.prismaService.pageWxContact(keyword, take, skip)
+                        .then(data => {
+                            resolve({data, total})
+                        }).catch(e => {
+                        LogUtils.error('fetchUserData', e)
+                        resolve({data: [], total: 0})
+                    })
+                }).catch(e => {
+                    LogUtils.error('fetchUserData', e)
+                    resolve({data: [], total: 0})
+                })
+            })
 
-            return {data, total}
         }
 
         const renderUserButton = (
@@ -271,12 +414,13 @@ export default class BotHelper extends Singleton<BotHelper> {
                 columns: 3
             }, {
                 keyword: queryUser,
-            })
+            }).then()
         })
 
         bot.action(/^clickUser:(.*)$/, async (ctx) => {
             const userName = ctx.match[1]
             ctx.reply(`你点击了用户 wx_id = ${userName}`)
+            // ctx.
             ctx.answerCbQuery()
         })
     }
@@ -291,10 +435,20 @@ export default class BotHelper extends Singleton<BotHelper> {
             const take = pageSize
             const keyword = queryParams?.keyword || ''
 
-            const total = await this.prismaService.countWxRoom(keyword)
-            const data = await this.prismaService.pageWxRoom(keyword, take, skip)
+            return new Promise<PagedResult<any>>(resolve => {
+                this.prismaService.countWxRoom(keyword).then(total => {
+                    this.prismaService.pageWxRoom(keyword, take, skip).then(data => {
+                        resolve({data, total})
+                    }).catch(e => {
+                        LogUtils.error('fetchRoomData', e)
+                        resolve({data: [], total: 0})
+                    })
+                }).catch(e => {
+                    LogUtils.error('fetchRoomData', e)
+                    resolve({data: [], total: 0})
+                })
+            })
 
-            return {data, total}
         }
 
         const renderRoomButton = (
@@ -337,43 +491,157 @@ export default class BotHelper extends Singleton<BotHelper> {
         ): Promise<PagedResult<any>> => {
             const skip = (pageNo - 1) * pageSize
             const take = pageSize
-            const keyword = queryParams?.keyword || ''
+            const keyword = queryParams?.keyword
+            const groupId = queryParams?.groupId
 
-            const total = await this.prismaService.countMessageContent(keyword)
-            const data = await this.prismaService.pageMessageContent(keyword, take, skip)
 
-            return {data, total}
+            return new Promise<PagedResult<any>>(resolve => {
+                if (!keyword) {
+                    return resolve({data: [], total: 0})
+                }
+                this.prismaService.countMessageContent(keyword, groupId).then(total => {
+                    this.prismaService.pageMessageContent(keyword, take, skip, groupId).then(data => {
+                        resolve({data, total})
+                    }).catch(e => {
+                        LogUtils.error('fetchScData', e)
+                        resolve({data: [], total: 0})
+                    })
+                }).catch(e => {
+                    LogUtils.error('fetchScData', e)
+                    resolve({data: [], total: 0})
+                })
+            })
         }
 
         const renderScButton = (
-            item: any,
+            item: any, // dbMessage
             index: number,
             pageNo: number,
             pageSize: number
         ) => {
             return {
-                text: item.content,
+                text: item.wx_msg_user_name + '：' + item.content,
                 callbackData: '',
-                url: `https://t.me/c/${item.group.tg_group_id.toString().slice(4)}/${item.tg_msg_id}`,
+                url: `https://t.me/c/${item.group?.tg_group_id.toString().slice(4)}/${item.tg_msg_id}`,
             }
         }
 
         registerPagination('SC', fetchScData, renderScButton)
 
         bot.command('sc', async (ctx) => {
+            let queryWords = ctx.args?.[0];
+            let groupId
+
+            // if (ctx.chat?.id) {
+            const group = await this.prismaService.prisma.group.findUnique({
+                where: {
+                    tg_group_id: ctx.chat.id
+                }
+            })
+            if (group) {
+                groupId = group.id
+            }
+
+
+            if (!queryWords) {
+                await ctx.reply('请使用 \'/sc 关键词\' 搜索');
+            } else {
+                // @ts-ignore
+                ctx.session.SCextraData = {
+                    keyword: queryWords,
+                    groupId: groupId
+                }
+
+                sendPagedList(ctx, 'SC', {
+                    pageNo: 1,
+                    pageSize: 10,
+                    columns: 1
+                }, {
+                    keyword: queryWords,
+                    groupId: groupId
+                }).then();
+            }
+        });
+
+    }
+
+    private checkRoomMember(bot: Telegraf) {
+        let currentMemberList: any[] = []
+        let chatId: number
+        const fetchScData = async (
+            pageNo: number,
+            pageSize: number,
+            queryParams: Record<string, any>
+        ): Promise<PagedResult<any>> => {
+            const skip = (pageNo - 1) * pageSize
+            const endIndex = pageSize * pageNo
+            const keyword = queryParams?.keyword
+            chatId = queryParams?.chatId ? queryParams?.chatId : chatId
+
+
+            return new Promise<PagedResult<any>>(resolve => {
+                if (chatId) {
+                    this.prismaService.prisma.group.findUnique({
+                        where: {tg_group_id: chatId}
+                    }).then(g => {
+                        if (g?.is_wx_room) {
+                            this.prismaService.prisma.wx_room.findUnique({
+                                where: {id: g?.wx_room_id}
+                            }).then(room => {
+                                let memberList = JSON.parse(room.memberList) as RoomMemberType[];
+                                if (keyword) {
+                                    memberList = memberList.filter(m => m.nickName?.includes(keyword) || m.displayName?.includes(keyword))
+                                }
+                                const data = memberList.slice(skip, endIndex)
+                                currentMemberList = data
+                                resolve({data, total: memberList.length})
+                            })
+                        } else {
+                            resolve({data: [], total: 0})
+                        }
+                    })
+                } else {
+                    resolve({data: [], total: 0})
+                }
+            })
+
+        }
+
+        const renderScButton = (
+            item: RoomMemberType,
+            index: number,
+            pageNo: number,
+            pageSize: number
+        ) => {
+            const text = item.displayName ? item.displayName + '(' + item.nickName + ')' : item.nickName
+            return {
+                text: text,
+                callbackData: `clickRoomml:${item.wxid}`,
+            }
+        }
+
+        registerPagination('ROOM_MEMBER', fetchScData, renderScButton, true)
+
+        bot.command('roomml', async (ctx) => {
             const queryUser = ctx.args?.[0] || ''
-            await sendPagedList(ctx, 'SC', {
+            sendPagedList(ctx, 'ROOM_MEMBER', {
                 pageNo: 1,
                 pageSize: 10,
                 columns: 1
             }, {
                 keyword: queryUser,
+                chatId: ctx.chat.id,
+                msgId: null
+            }).then(res => {
+                LogUtils.debug(res)
             })
         })
 
-        bot.action(/^clickSc:(.*)$/, async (ctx) => {
-            const chatroomId = ctx.match[1]
-            ctx.reply(`你点击了chatroomId = ${chatroomId}`)
+        bot.action(/^clickRoomml:(.*)$/, async (ctx) => {
+            const wxid = ctx.match[1]
+            const member: RoomMemberType = currentMemberList.find(m => m.wxid === wxid)
+            ctx.reply(`${member.nickName}信息：
+<pre><code class="language-json">${JSON.stringify(member, null, 2)}</code></pre>`, {parse_mode: 'HTML'})
             ctx.answerCbQuery()
         })
     }

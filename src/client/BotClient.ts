@@ -15,7 +15,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
     private constructor() {
         super();
         this.bot = new Telegraf(ConfigEnv.BOT_TOKEN)
-        this.bot.use(session())
+        this.bot.use(session({defaultSession: () => ({})}))
     }
 
     static getInstance(): BotClient {
@@ -99,11 +99,17 @@ export default class BotClient extends AbstractClient<Telegraf> {
         return new Promise<object>((resolve, reject) => {
             let result = null
             const telegram = this.bot.telegram;
+            if (msg.title && !msg.title?.endsWith('\n')) {
+                msg.title += '\n'
+            } else {
+                msg.title = ''
+            }
+            let text = msg.title ? msg.title + msg.content : msg.content
             switch (msg.msgType) {
                 case "quote":
                     const content = msg.parentId ? msg.ext?.title
                         : `<blockquote>${msg.ext?.referMsg_title}</blockquote>&#10;${msg.ext?.title}`
-                    result = telegram.sendMessage(msg.chatId, content, {
+                    result = telegram.sendMessage(msg.chatId, msg.title + content, {
                         parse_mode: 'HTML',
                         reply_parameters: msg.parentId ? {
                             message_id: msg.replyId
@@ -111,7 +117,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     })
                     break;
                 case "text":
-                    result = telegram.sendMessage(msg.chatId, msg.content, msg.ext)
+                    result = telegram.sendMessage(msg.chatId, text, msg.ext)
                     break;
                 case "image":
                     result = telegram.sendPhoto(msg.chatId, {source: msg.file}, msg.ext)
@@ -133,10 +139,10 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     break;
                 case "redPacket":
                     if (!msg.file) {
-                        result = telegram.sendMessage(msg.chatId, msg.content, msg.ext)
+                        result = telegram.sendMessage(msg.chatId, text, msg.ext)
                     } else {
                         result = telegram.sendPhoto(msg.chatId, {source: msg.file}, {
-                            caption: msg.content,
+                            caption: text,
                         })
                     }
                     break;

@@ -3,6 +3,8 @@ import {ClientEnum} from "../constant/ClientConstants";
 export type SendMessage = {
     id?: string,
     msgType: MsgType,
+    // 群或者自己发送的需要title
+    title?: string | '',
     content: string,
     file?: Buffer,
     fileName?: string,
@@ -11,6 +13,7 @@ export type SendMessage = {
     },
     chatId?: number,
     fromWxId?: string,
+    wx_msg_user_name?: string,
     parentId?: number,
     replyId?: number,
 }

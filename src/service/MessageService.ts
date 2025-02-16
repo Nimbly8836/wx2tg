@@ -14,7 +14,7 @@ export class MessageService extends Singleton<MessageService> {
 
     private clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
 
-    private loopTime = 503
+    private loopTime = 829
 
     private maxRetries = 3;
 
@@ -52,79 +52,97 @@ export class MessageService extends Singleton<MessageService> {
         }
     }
 
-    private async processQueue(): Promise<void> {
+    private processQueue() {
         if (this.messageQueue.length > 0) {
-            const sendMessage = this.messageQueue.shift()
-
+            const sendMessage = this.messageQueue.shift();
             let retryCount = sendMessage?.retriesNumber || 0;
 
-            if (!sendMessage?.success && !sendMessage?.isSending && retryCount < this.maxRetries) {
-                sendMessage.isSending = true;
-                const client = this.clients.get(sendMessage.client);
-                const send = client.sendMessage(sendMessage)
-                    .then(async resMsg => {
-                        sendMessage.success = true;
-                        sendMessage.isSending = false;
-                        this.prismaService.prisma.message.create({
-                            data: {
-                                from_wx_id: sendMessage.fromWxId,
-                                content: sendMessage.content,
-                                tg_msg_id: resMsg?.message_id,
-                                wx_msg_id: sendMessage.ext?.wxMsgId,
-                                parent_id: sendMessage.parentId,
-                                group: {
-                                    connect: {
-                                        tg_group_id: sendMessage.chatId,
+            this.prismaService.prisma.message.findFirst({
+                where: {wx_msg_id: sendMessage?.ext?.wxMsgId, from_wx_id: sendMessage?.fromWxId}
+            }).then(existingMessage => {
+                if (existingMessage) {
+                    sendMessage.success = true;
+                    sendMessage.isSending = false;
+                    return;
+                }
+
+                if (!sendMessage?.success && !sendMessage?.isSending && retryCount < this.maxRetries) {
+                    sendMessage.isSending = true;
+                    const client = this.clients.get(sendMessage.client);
+
+                    client.sendMessage(sendMessage)
+                        .then(resMsg => {
+                            sendMessage.success = true;
+                            sendMessage.isSending = false;
+
+                            this.prismaService.prisma.message.create({
+                                data: {
+                                    from_wx_id: sendMessage.fromWxId,
+                                    content: sendMessage.content,
+                                    tg_msg_id: resMsg?.message_id,
+                                    wx_msg_id: sendMessage.ext?.wxMsgId,
+                                    parent_id: sendMessage.parentId,
+                                    wx_msg_user_name: sendMessage.wx_msg_user_name,
+                                    group: {
+                                        connect: {
+                                            tg_group_id: sendMessage.chatId,
+                                        }
                                     }
                                 }
-                            }
-                        }).then(() => {
-                            LogUtils.debug('Message saved');
+                            }).then(() => {
+                                LogUtils.debug('Message saved');
+                            }).catch(e => {
+                                LogUtils.error('Failed to save message', e, sendMessage);
+                            });
                         }).catch(e => {
-                            LogUtils.error('Failed to save message', e, sendMessage);
-                        });
-                    }).catch(async e => {
                         LogUtils.error('Failed to send message', e);
-                        // 增加重试次数
+
+                        // Increment retry count and re-add to the queue for retry
                         retryCount += 1;
                         sendMessage.retriesNumber = retryCount;
+                        this.messageQueue.unshift(sendMessage);
 
-                        // 如果错误是因为群组升级为超级群组
-                        if (e.response?.error_code === 400
-                            && e.response?.description === 'Bad Request: group chat was upgraded to a supergroup chat') {
+                        // Handle group upgrade to supergroup
+                        if (e.response?.error_code === 400 &&
+                            e.response?.description === 'Bad Request: group chat was upgraded to a supergroup chat') {
                             const migrateToChatId = e?.response?.parameters?.migrate_to_chat_id;
                             if (migrateToChatId) {
+                                // Update the group in the database asynchronously
                                 this.prismaService.prisma.group.update({
                                     where: {tg_group_id: sendMessage.chatId},
                                     data: {tg_group_id: Number(migrateToChatId)}
-                                }).then(() => send);
+                                }).then(() => {
+                                    // After migration, we process the queue again
+                                    this.processQueue();
+                                }).catch(groupUpdateError => {
+                                    LogUtils.error('Failed to update group', groupUpdateError);
+                                });
                             }
                         }
                     }).finally(() => {
-                        // 如果达到最大重试次数，停止重试
+                        // Stop retrying if max retries reached
                         if (retryCount >= this.maxRetries) {
                             LogUtils.error(`Max retries reached for message: ${sendMessage.content}`);
                             sendMessage.isSending = false;
-                            sendMessage.success = false; // 标记为失败
+                            sendMessage.success = false; // Mark as failed
                         }
                     });
-
-                // 保证重试次数达到最大值时停止重试
-                send.catch(() => send)
-                    .finally(() => {
-                        if (retryCount >= this.maxRetries) {
-                            sendMessage.isSending = false;
-                        }
-                    });
-            }
+                }
+            }).catch(e => {
+                LogUtils.error('Error checking if message exists', e);
+            });
         }
     }
 
 
     private startSend(): void {
+        const minInterval = 569; // Minimum delay
+        const maxInterval = this.loopTime; // Maximum delay
+
         setInterval(async () => {
-            await this.processQueue()
-        }, this.loopTime)
+            this.processQueue();
+        }, Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval); // Random delay between min and max
     }
+
 
 }

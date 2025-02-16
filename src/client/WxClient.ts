@@ -12,6 +12,9 @@ import {LogUtils} from "../util/LogUtils";
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number
+    private messageSet: Set<string> = new Set();
+    private wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
+
 
     private constructor() {
         super();
@@ -60,29 +63,43 @@ export class WxClient extends AbstractClient<GeweBot> {
                         prismaService.getConfigByToken().then(findConfig => {
                             const chatId = findConfig.bot_chat_id
                             botClient.bot.telegram.editMessageCaption(Number(chatId),
-                                this.scanPhotoMsgId, null, '登录成功')
+                                this.scanPhotoMsgId, null, '微信，登录成功')
                         })
                     }
                 }).catch(e => {
                     LogUtils.error('WxClient get info error : %s', e)
                 })
-                resolve(true)
                 this.onMessage(null)
                 this.loginTime = new Date().getTime() / 1000
+                resolve(true)
 
             }).catch(e => {
                 reject(e)
             })
 
+            this.onMessage(null)
         })
     }
 
     logout(): Promise<boolean> {
-        return null
+        return this.bot.logout()
     }
 
     sendMessage(any: any): Promise<Record<string, any>> {
         return null
+    }
+
+    check(): Promise<boolean> {
+        return this.bot.checkOnline()
+    }
+
+    private isDuplicateMessage(msgId: string): boolean {
+        if (this.messageSet.has(msgId)) {
+            return true;
+        }
+        this.messageSet.add(msgId);
+        setTimeout(() => this.messageSet.delete(msgId), 30000);
+        return false;
     }
 
     onMessage(any: any): void {
@@ -108,10 +125,14 @@ export class WxClient extends AbstractClient<GeweBot> {
             }
         })
         this.bot.on('message', async (msg) => {
-                const wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
+
+                if (this.isDuplicateMessage(msg._newMsgId)) {
+                    return
+                }
                 // 只处理登录之后的消息
+                LogUtils.debug('message: %s', msg.text())
                 if (msg._createTime >= this.loginTime) {
-                    wxMessageHelper.sendMessages(msg)
+                    this.wxMessageHelper.sendMessages(msg).then()
                 }
             }
         )
