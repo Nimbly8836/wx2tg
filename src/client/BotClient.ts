@@ -101,8 +101,6 @@ export default class BotClient extends AbstractClient<Telegraf> {
             const telegram = this.bot.telegram;
             if (msg.title && !msg.title?.endsWith('\n')) {
                 msg.title += '\n'
-            } else {
-                msg.title = ''
             }
             let text = msg.title ? msg.title + msg.content : msg.content
             switch (msg.msgType) {
@@ -117,19 +115,24 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     })
                     break;
                 case "text":
+                case "image": // 先发送文字
                     result = telegram.sendMessage(msg.chatId, text, msg.ext)
                     break;
-                case "image":
-                    result = telegram.sendPhoto(msg.chatId, {source: msg.file}, msg.ext)
-                    break;
                 case "audio":
-                    result = telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
+                    // result = telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
                     break;
                 case "video":
-                    result = telegram.sendVideo(msg.chatId, {source: msg.file}, msg.ext)
-                    break;
                 case "file":
-                    result = telegram.sendDocument(msg.chatId, {source: msg.file}, msg.ext)
+                    result = telegram.sendMessage(msg.chatId, text, {
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{
+                                    text: '下载',
+                                    callback_data: `download:${msg.ext?.wxMsgId}`
+                                }]
+                            ]
+                        }
+                    })
                     break;
                 case "location":
                     if (!msg.ext.latitude || !msg.ext.longitude) {
@@ -141,7 +144,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     if (!msg.file) {
                         result = telegram.sendMessage(msg.chatId, text, msg.ext)
                     } else {
-                        result = telegram.sendPhoto(msg.chatId, {source: msg.file}, {
+                        result = telegram.sendPhoto(msg.chatId, {source: msg.file as Buffer}, {
                             caption: text,
                         })
                     }
@@ -163,6 +166,8 @@ export default class BotClient extends AbstractClient<Telegraf> {
         botHelper.filterOwner(this.bot)
         botHelper.setCommands(this.bot)
         botHelper.onCommand(this.bot)
+        botHelper.onMessage(this.bot)
+        botHelper.onAction(this.bot)
         this.bot.catch((err, ctx: Context) => {
             this.logError('BotClient catch error : %s', err)
         })

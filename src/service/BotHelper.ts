@@ -17,11 +17,17 @@ import {Constants} from "../constant/Constants";
 import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
 import {updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
+import {WxFileClient} from "../client/WxFileClient";
+import {Message} from "gewechaty";
+import {forward} from "../util/GewePostUtils";
+import FileUtils from "../util/FileUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
     private prismaService = PrismaService.getInstance(PrismaService);
     private wxClient = WxClient.getInstance();
+    private wxFileClient = WxFileClient.getInstance();
+    private tgClient = TgClient.getInstance();
 
     constructor() {
         super();
@@ -162,7 +168,7 @@ export default class BotHelper extends Singleton<BotHelper> {
             }).then(g => {
                 if (g?.is_wx_room) {
                     this.prismaService.prisma.wx_room.findUnique({
-                        where: {id: g.wx_room_id}
+                        where: {id: g?.wx_room_id}
                     }).then(room => {
                         // const memberList = room.memberList
                         room.memberList = ''
@@ -284,34 +290,23 @@ export default class BotHelper extends Singleton<BotHelper> {
         this.checkRoomMember(bot)
         // 分页初始化
         initPaginationCallback(bot)
-        this.onMessage(bot)
     }
 
     public onMessage(bot: Telegraf) {
-        const geweBot = WxClient.getInstance().bot;
-
         bot.on(message('text'), async ctx => {
             const text = ctx.message.text;
             if (text.startsWith('/')) {
                 return;
             }
-            this.prismaService.prisma.group.findUnique({
-                where: {
-                    tg_group_id: ctx.chat.id
-                }
-            }).then(r => {
-                if (r?.is_wx_room) {
-                    // @ts-ignore
-                    geweBot.Room.find({id: r?.wx_id}).then(room => {
-                        room.say(text)
-                    })
-                } else {
-                    geweBot.Contact.find({id: r?.wx_id}).then(contact => {
-                        contact.say(text)
-                    })
-                }
-
+            this.wxClient.sendMessage({
+                msgType: 'text',
+                chatId: ctx.chat.id,
+                content: text,
             })
+        })
+
+        bot.on(message('document'), ctx => {
+            // this.tgClient.
         })
 
     }
@@ -646,7 +641,43 @@ export default class BotHelper extends Singleton<BotHelper> {
         })
     }
 
-    private onAction(bot: Telegraf) {
+    public onAction(bot: Telegraf) {
+        bot.action(/^download:(.*)$/, async ctx => {
+            // 检查是否有登陆微信文件助手
+            if (!this.wxFileClient.hasLogin) {
+                this.wxFileClient.login().then(() => {
+                })
+                ctx.reply('请先登陆微信文件助手')
+                ctx.answerCbQuery()
+            } else {
+                const wxMsgId = ctx.match[1]
+                this.prismaService.getConfigByToken().then(config => {
+                    this.prismaService.prisma.message.findFirst({
+                        where: {
+                            wx_msg_id: wxMsgId,
+                        }
+                    }).then(msg => {
+                        forward(msg.wx_msg_text, Constants.FILE_HELPER, msg.wx_msg_type_text)
+                            .then(res => {
+                                // 更新 msg 设置转发的id
+                                LogUtils.debug('forward file message', res)
+                                this.prismaService.prisma.message.update({
+                                    where: {id: msg.id},
+                                    data: {
+                                        // @ts-ignore
+                                        wx_hp_msg_id: res.newMsgId.toString()
+                                    }
+                                }).then(() => {
 
+                                })
+                                ctx.answerCbQuery('正在下载文件，请稍后')
+                            }).catch(e => {
+                            LogUtils.error('forward file message', e)
+                            ctx.answerCbQuery('文件转发失败')
+                        })
+                    })
+                })
+            }
+        })
     }
 }

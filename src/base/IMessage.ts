@@ -6,16 +6,20 @@ export type SendMessage = {
     // 群或者自己发送的需要title
     title?: string | '',
     content: string,
-    file?: Buffer,
+    file?: Buffer | string,
     fileName?: string,
     ext?: {
         [key: string]: any,
     },
     chatId?: number,
     fromWxId?: string,
-    wx_msg_user_name?: string,
+    wxMsgUserName?: string,
     parentId?: number,
     replyId?: number,
+    // 返回的消息id
+    resMessageId?: string,
+    wxMsgType?: number,
+    wxMsgTypeText?: string,
 }
 
 export type SendingMessage = SendMessage & {

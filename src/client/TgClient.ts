@@ -124,7 +124,20 @@ export default class TgClient extends AbstractClient<TelegramClient> {
     }
 
     sendMessage(msgParams: SendMessage): Promise<Record<string, any>> {
-        throw new Error("Method not implemented.");
+        return new Promise((resolve, reject) => {
+            const msgType = msgParams.msgType;
+            switch (msgType) {
+                case "file":
+                    this.bot.sendFile(msgParams.chatId,
+                        {
+                            file: (msgParams.file + '/' + msgParams.fileName) as string,
+                        }
+                    ).then(resolve).catch(reject)
+                    break;
+                case "video":
+
+            }
+        })
     }
 
     onMessage(any: any): void {

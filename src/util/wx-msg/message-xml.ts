@@ -97,6 +97,7 @@ export interface AppMsgXmlSchema {
         appinfo: {
             appname: any;
         };
+        videomsg: VideoMsgPayload,
     };
 }
 
@@ -127,6 +128,30 @@ export interface WCPayInfo {
     coverinfo?: string; // 封面信息
     broaden?: string; // 扩展字段
 }
+
+export interface VideoMsgPayload {
+    aeskey?: string;
+    cdnvideourl?: string;
+    cdnthumbaeskey?: string;
+    cdnthumburl?: string;
+    length?: number;
+    playlength?: number;
+    cdnthumblength?: number;
+    cdnthumbwidth?: number;
+    cdnthumbheight?: number;
+    fromusername?: string;
+    md5?: string;
+    newmd5?: string;
+    isplaceholder?: number;
+    rawmd5?: string;
+    rawlength?: number;
+    cdnrawvideourl?: string;
+    cdnrawvideoaeskey?: string;
+    overwritenewmsgid?: number;
+    originsourcemd5?: string;
+    isad?: number;
+}
+
 
 export interface AppAttachPayload {
     totallen?: number;
@@ -199,6 +224,7 @@ export interface AppMessagePayload {
     refermsg?: ReferMsgPayload;
     items?: appMsgXmlSchema_mmreader_item [];
     wcpayinfo?: WCPayInfo;
+    videomsg?: VideoMsgPayload;
 }
 
 export interface appMsgXmlSchema_mmreader_item {

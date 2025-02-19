@@ -75,6 +75,7 @@ export class MessageService extends Singleton<MessageService> {
                             sendMessage.success = true;
                             sendMessage.isSending = false;
 
+
                             this.prismaService.prisma.message.create({
                                 data: {
                                     from_wx_id: sendMessage.fromWxId,
@@ -82,7 +83,10 @@ export class MessageService extends Singleton<MessageService> {
                                     tg_msg_id: resMsg?.message_id,
                                     wx_msg_id: sendMessage.ext?.wxMsgId,
                                     parent_id: sendMessage.parentId,
-                                    wx_msg_user_name: sendMessage.wx_msg_user_name,
+                                    wx_msg_user_name: sendMessage.wxMsgUserName,
+                                    wx_msg_text: sendMessage.ext?.wxMsgText,
+                                    wx_msg_type: sendMessage.wxMsgType,
+                                    wx_msg_type_text: sendMessage.wxMsgTypeText,
                                     group: {
                                         connect: {
                                             tg_group_id: sendMessage.chatId,

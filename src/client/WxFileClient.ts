@@ -6,14 +6,28 @@ import QRCode from "qrcode";
 import PrismaService from "../service/PrismaService";
 import * as PUPPET from 'wechaty-puppet'
 import BotClient from "./BotClient";
+import * as fs from "node:fs";
+import {Constants} from "../constant/Constants";
+import TgClient from "./TgClient";
 
 
 export class WxFileClient extends AbstractClient<Wechaty> {
     private scanMsgId: number | undefined;
     private prismaService = PrismaService.getInstance(PrismaService)
+    private tgClient = TgClient.getInstance();
 
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
+            // if (fs.existsSync('storage/Wx2Tg_File_Client.memory-card.json')) {
+            //     fs.unlinkSync('storage/Wx2Tg_File_Client.memory-card.json')
+            // }
+            // if (fs.existsSync('storage/Wx2Tg_File_Client.memory-card.json')) {
+            //
+            // }
+            this.bot.start().then(async () => {
+                this.hasLogin = true
+                resolve(true)
+            }).catch(reject)
         })
     }
 
@@ -35,7 +49,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                         botClient.bot.telegram.sendPhoto(Number(config.bot_chat_id), {
                             source: buff
                         }, {
-                            caption: '请用微信扫描二维码登录文件助手'
+                            caption: '请使用「微信」扫描二维码登录文件助手'
                         }).then(msg => {
                             this.scanMsgId = msg.message_id
                         })
@@ -45,13 +59,17 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         })
 
         this.bot.on('login', async user => {
-            if (this.scanMsgId) {
-                this.prismaService.getConfigByToken().then(findConfig => {
-                    const chatId = findConfig.bot_chat_id
+
+            this.prismaService.getConfigByToken().then(findConfig => {
+                const chatId = findConfig.bot_chat_id
+                if (this.scanMsgId) {
                     botClient.bot.telegram.editMessageCaption(Number(chatId),
                         this.scanMsgId, null, '文件助手，登录成功')
-                })
-            }
+                } else {
+                    botClient.bot.telegram.sendMessage(Number(chatId), '文件助手，登录成功')
+                }
+
+            })
             this.hasLogin = true
         })
 
@@ -63,6 +81,50 @@ export class WxFileClient extends AbstractClient<Wechaty> {
             switch (msg.type()) {
                 case PUPPET.types.Message.Video:
                 case PUPPET.types.Message.Attachment:
+                    // 保存文件， update message 表
+                    this.prismaService.prisma.message.findFirst({
+                        where: {
+                            wx_hp_msg_id: msg.id
+                        },
+                        include: {
+                            group: true
+                        }
+                    }).then(inDbMsg => {
+                        if (inDbMsg) {
+                            msg.toFileBox().then(fileBox => {
+                                const filePath = Constants.DOWNLOAD_PATH + '/' + inDbMsg.from_wx_id
+                                const file = filePath + '/' + fileBox.name
+                                if (!fs.existsSync(filePath)) {
+                                    fs.mkdirSync(filePath, {recursive: true})
+                                }
+                                fileBox.toFile(file, true).then(() => {
+                                    // 发送文件
+                                    this.tgClient.sendMessage({
+                                        msgType: 'file',
+                                        content: '',
+                                        file: filePath,
+                                        fileName: fileBox.name,
+                                        chatId: Number(inDbMsg.group.tg_group_id)
+                                    }).then()
+                                    // 更新数据库
+                                    this.prismaService.prisma.message.update({
+                                        where: {
+                                            id: inDbMsg.id
+                                        },
+                                        data: {
+                                            file_path: filePath,
+                                            file_name: fileBox.name,
+                                        }
+                                    }).then(() => {
+
+                                    })
+
+                                })
+                            })
+                        }
+                    })
+
+                    break;
 
             }
         })
@@ -75,13 +137,22 @@ export class WxFileClient extends AbstractClient<Wechaty> {
             this.hasLogin = false
             this.ready = false
         })
+
+        this.bot.on('stop', () => {
+            this.hasLogin = false
+            this.ready = false
+        })
     }
 
     private constructor() {
         super();
+        // 无法从文件缓存中恢复
         this.bot = WechatyBuilder.build({
-            name: 'storage/fileHelper',
+            name: 'storage/Wx2Tg_File_Client',
             puppet: 'wechaty-puppet-wechat4u',
+            puppetOptions: {
+                timeoutSeconds: 60 * 3,
+            },
         });
     }
 
@@ -95,6 +166,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
 
     private initialize(): void {
         this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
+        this.onMessage(null);
     }
 
 

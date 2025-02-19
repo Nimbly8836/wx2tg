@@ -10,7 +10,7 @@ import TgClient from "../client/TgClient";
 import {BigInteger} from "big-integer";
 import {returnBigInt} from "telegram/Helpers";
 
-export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, resolve: Function) {
+export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, configId: number,resolve: Function) {
     // 选择查询表格
     const prismaService = PrismaService.getInstance(PrismaService);
     const query = wxMsg.isRoom ?
@@ -36,6 +36,7 @@ export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId:
         tg_group_id: channelId,
         group_name: title,
         is_wx_room: wxMsg.isRoom,
+        config_id: configId,
     };
 
     query.then(entity => {

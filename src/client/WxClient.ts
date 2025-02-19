@@ -1,5 +1,5 @@
 import {AbstractClient} from "../base/AbstractClient";
-import {GeweBot} from "gewechaty";
+import {Contact, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
@@ -7,6 +7,9 @@ import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
 import WxMessageHelper from "../service/WxMessageHelper";
 import {LogUtils} from "../util/LogUtils";
+import {Constants} from "../constant/Constants";
+import {SendMessage} from "../base/IMessage";
+import FileUtils from "../util/FileUtils";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -14,6 +17,7 @@ export class WxClient extends AbstractClient<GeweBot> {
     private scanPhotoMsgId: number
     private messageSet: Set<string> = new Set();
     private wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
+    private prismaService = PrismaService.getInstance(PrismaService)
 
 
     private constructor() {
@@ -43,6 +47,8 @@ export class WxClient extends AbstractClient<GeweBot> {
 
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
+
+            this.loginTime = new Date().getTime() / 1000
 
             this.bot.start().then(async ({app, router}) => {
                 app.use(router.routes()).use(router.allowedMethods())
@@ -85,8 +91,45 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.logout()
     }
 
-    sendMessage(any: any): Promise<Record<string, any>> {
-        return null
+    sendMessage(msgParams: SendMessage): Promise<Record<string, any>> {
+        return new Promise<Record<string, any>>((resolve, reject) => {
+            // 查找是群还是用户
+            this.prismaService.prisma.group.findUniqueOrThrow({
+                where: {
+                    tg_group_id: msgParams.chatId
+                }
+            }).then(group => {
+                const send = (to: Contact | Room) => {
+                    switch (msgParams.msgType) {
+                        case "text":
+                            to.say(msgParams.content).then(resolve)
+                            break;
+                        case "file":
+                        case "audio":
+                        case "image":
+                        case 'video':
+                            const fileBox = Filebox.fromBuff(msgParams.file as Buffer, msgParams.fileName)
+                            to.say(fileBox).then(resolve)
+                            break;
+
+                    }
+                }
+                if (group.is_wx_room) {
+                    // @ts-ignore
+                    this.bot.Room.find({id: group.wx_room_id.toString()}).then(room => {
+                        send(room)
+                    })
+                } else {
+                    this.bot.Contact.find({id: group.wx_contact_id.toString()}).then(contact => {
+                        send(contact)
+                    })
+                }
+
+            }).catch(e => {
+                this.logError('WxClient find group error: %s', e)
+            })
+
+        })
     }
 
     check(): Promise<boolean> {
@@ -129,9 +172,9 @@ export class WxClient extends AbstractClient<GeweBot> {
                 if (this.isDuplicateMessage(msg._newMsgId)) {
                     return
                 }
-                // 只处理登录之后的消息
-                LogUtils.debug('message: %s', msg.text())
-                if (msg._createTime >= this.loginTime) {
+                // 只处理登录之后的消息 且不是发送给文件助手的消息
+                // 没有类型的消息不处理，大多是通知或者无法处理的消息
+                if (msg._createTime >= this.loginTime && msg.toId !== Constants.FILE_HELPER && msg.type()) {
                     this.wxMessageHelper.sendMessages(msg).then()
                 }
             }

@@ -3,7 +3,7 @@ import {
     AppMessagePayload,
     AppMsgXmlSchema,
     ChannelsMsgPayload,
-    MiniAppMsgPayload, WCPayInfo
+    MiniAppMsgPayload, VideoMsgPayload, WCPayInfo
 } from "./wx-msg/message-xml";
 import {parseString} from 'xml2js'
 import {LogUtils} from "./LogUtils";
@@ -28,15 +28,15 @@ export async function xmlToJson(xml: string): Promise<any> {
 export async function parseAppMsgMessagePayload(messageContent: string): Promise<AppMessagePayload> {
     return new Promise((resolve, reject) => {
         xmlToJson(messageContent).then((appMsgXml: AppMsgXmlSchema) => {
-            const {title, des, url, thumburl, type, md5, recorditem, mmreader} = appMsgXml.msg.appmsg
+            const {title, des, url, thumburl, type, md5, recorditem, mmreader} = appMsgXml.msg?.appmsg
 
             let appattach: AppAttachPayload | undefined
             let channel: ChannelsMsgPayload | undefined
             let miniApp: MiniAppMsgPayload | undefined
             let wcpayinfo: WCPayInfo | undefined
-            const tmp = appMsgXml.msg.appmsg.appattach
-            const channeltmp = appMsgXml.msg.appmsg.finderFeed
-            const minitmp = appMsgXml.msg.appmsg.weappinfo
+            const tmp = appMsgXml.msg.appmsg?.appattach
+            const channeltmp = appMsgXml.msg.appmsg?.finderFeed
+            const minitmp = appMsgXml.msg.appmsg?.weappinfo
             if (tmp) {
                 appattach = {
                     aeskey: tmp.aeskey,
@@ -76,7 +76,7 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
             }
 
             if (appMsgXml.msg?.appmsg?.wcpayinfo) {
-                wcpayinfo = appMsgXml.msg.appmsg.wcpayinfo
+                wcpayinfo = appMsgXml.msg.appmsg?.wcpayinfo
             }
 
             resolve({
@@ -86,13 +86,14 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
                 md5,
                 miniApp,
                 recorditem,
-                refermsg: appMsgXml.msg.appmsg.refermsg,
+                refermsg: appMsgXml.msg.appmsg?.refermsg,
                 thumburl,
                 title,
                 type: parseInt(type, 10),
                 url,
                 items: mmreader?.category?.item,
-                wcpayinfo
+                wcpayinfo,
+                videomsg: appMsgXml.msg.videomsg,
             })
         })
     })
