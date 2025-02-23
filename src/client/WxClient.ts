@@ -1,5 +1,5 @@
 import {AbstractClient} from "../base/AbstractClient";
-import {Contact, Filebox, GeweBot, Room} from "gewechaty";
+import {Contact, Filebox, GeweBot, Room, WeVideo} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
@@ -10,6 +10,7 @@ import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
 import FileUtils from "../util/FileUtils";
+import {join} from "node:path";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -25,7 +26,10 @@ export class WxClient extends AbstractClient<GeweBot> {
         this.bot = new GeweBot({
             base_api: ConfigEnv.BASE_API,
             file_api: ConfigEnv.FILE_API,
-            debug: false,
+            port: ConfigEnv.GEWE_PORT,
+            static: ConfigEnv.GEWE_STATIC,
+            proxy: ConfigEnv.GEWE_PROXY,
+            // debug: false,
             cache_path: 'storage/gewe',
         })
     }
@@ -97,6 +101,10 @@ export class WxClient extends AbstractClient<GeweBot> {
             this.prismaService.prisma.group.findUniqueOrThrow({
                 where: {
                     tg_group_id: msgParams.chatId
+                },
+                include: {
+                    wx_room: true,
+                    wx_contact: true
                 }
             }).then(group => {
                 const send = (to: Contact | Room) => {
@@ -104,23 +112,26 @@ export class WxClient extends AbstractClient<GeweBot> {
                         case "text":
                             to.say(msgParams.content).then(resolve)
                             break;
+                        case 'video': // 视频使用文件类型
                         case "file":
                         case "audio":
                         case "image":
-                        case 'video':
-                            const fileBox = Filebox.fromBuff(msgParams.file as Buffer, msgParams.fileName)
+                            const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
+                                msgParams.fileName, 'file')
                             to.say(fileBox).then(resolve)
+                            break;
+                        default:
                             break;
 
                     }
                 }
-                if (group.is_wx_room) {
+                if (group.is_wx_room && group?.wx_room?.chatroomId) {
                     // @ts-ignore
-                    this.bot.Room.find({id: group.wx_room_id.toString()}).then(room => {
+                    this.bot.Room.find({id: group?.wx_room?.chatroomId}).then(room => {
                         send(room)
                     })
-                } else {
-                    this.bot.Contact.find({id: group.wx_contact_id.toString()}).then(contact => {
+                } else if (group.wx_contact?.userName) {
+                    this.bot.Contact.find({id: group.wx_contact?.userName}).then(contact => {
                         send(contact)
                     })
                 }
@@ -141,7 +152,7 @@ export class WxClient extends AbstractClient<GeweBot> {
             return true;
         }
         this.messageSet.add(msgId);
-        setTimeout(() => this.messageSet.delete(msgId), 30000);
+        setTimeout(() => this.messageSet.delete(msgId), 60000);
         return false;
     }
 

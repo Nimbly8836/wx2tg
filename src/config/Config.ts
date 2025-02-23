@@ -19,6 +19,9 @@ export const ConfigEnv = {
     BASE_API: process.env.BASE_API || '',
     FILE_API: process.env.FILE_API || '',
     LOG_LEVEL: process.env.LOG_LEVEL || 'default',
+    GEWE_PORT: Number(process.env.GEWE_PORT) || 3000,
+    GEWE_PROXY: process.env.GEWE_PROXY || '',
+    GEWE_STATIC: process.env.GEWE_STATIC || 'storage',
 }
 
 export type ProxyOptions = {

@@ -9,6 +9,9 @@ import BotClient from "./BotClient";
 import * as fs from "node:fs";
 import {Constants} from "../constant/Constants";
 import TgClient from "./TgClient";
+import {ConfigEnv} from "../config/Config";
+import {TgMessageUtils} from "../util/TgMessageUtils";
+import {LogUtils} from "../util/LogUtils";
 
 
 export class WxFileClient extends AbstractClient<Wechaty> {
@@ -17,6 +20,11 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     private tgClient = TgClient.getInstance();
 
     login(): Promise<boolean> {
+        // 发送文件需要的路径 暂时写死, 不改 ge_wechaty
+        const path = `${ConfigEnv.GEWE_STATIC}/${Constants.GEWE_TEMP}`;
+        if (!fs.existsSync(path)) {
+            fs.mkdirSync(path, {recursive: true})
+        }
         return new Promise<boolean>((resolve, reject) => {
             // if (fs.existsSync('storage/Wx2Tg_File_Client.memory-card.json')) {
             //     fs.unlinkSync('storage/Wx2Tg_File_Client.memory-card.json')
@@ -105,7 +113,9 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                                         file: filePath,
                                         fileName: fileBox.name,
                                         chatId: Number(inDbMsg.group.tg_group_id)
-                                    }).then()
+                                    }).then(res => {
+                                        TgMessageUtils.addMessage(Number(inDbMsg.group.tg_group_id), res.id)
+                                    })
                                     // 更新数据库
                                     this.prismaService.prisma.message.update({
                                         where: {
@@ -148,7 +158,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         super();
         // 无法从文件缓存中恢复
         this.bot = WechatyBuilder.build({
-            name: 'storage/Wx2Tg_File_Client',
+            name: Constants.WX_FILE_CLIENT,
             puppet: 'wechaty-puppet-wechat4u',
             puppetOptions: {
                 timeoutSeconds: 60 * 3,

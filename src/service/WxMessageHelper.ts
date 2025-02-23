@@ -277,6 +277,10 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                 if (setting.blockPublicMessages && msg.fromId.startsWith('gh_')) {
                     return
                 }
+                // 自己发送的消息
+                if (setting.blockYouSelfMessage && msg._self) {
+                    return
+                }
             }
             await this.createGroup(msg, config).then(async (res) => {
                 if (res) {
@@ -396,7 +400,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         // 文件类型的消息
                         case wxMsgType.Image:
                             // 先发送文字
-                            addMessage.content = '收到[图片]'
+                            addMessage.content = msg._self ? '你发送了[图片]' : '收到[图片]'
                             addMessage.wxMsgTypeText = MessageType.Image;
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             const editMsgImage = (fileBox: Filebox) => {
@@ -405,7 +409,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                     include: {group: true}
                                 }).then(existingMessage => {
                                     const tgGroupId = Number(existingMessage?.group?.tg_group_id);
-                                    if (tgGroupId) {
+                                    if (tgGroupId && fileBox && fileBox.url !== ConfigEnv.FILE_API) {
                                         FileUtils.downloadBuffer(fileBox.url).then(fileBuffer => {
                                             this.tgBotClient.bot.telegram.editMessageMedia(tgGroupId,
                                                 Number(existingMessage.tg_msg_id),
@@ -418,6 +422,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
                                 })
                             }
+
                             msg.toFileBox(1).then(fileBox1 => {
                                 // 没有的情况下
                                 if (!fileBox1 || fileBox1.url == ConfigEnv.FILE_API) {
@@ -438,13 +443,14 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             })
                             break;
                         case wxMsgType.Voice:
+                            break;
                         case wxMsgType.Emoji:
 
-                            LogUtils.debug('Voice/Emoji message: %s', msg.text())
-                            msg.toFileBox().then(fileBox => {
-                                LogUtils.debug('Voice/Emoji message: %s', fileBox.name)
-                                fileBox.toFile(`storage/downloads/${fileBox.name}`)
-                            })
+                            LogUtils.debug('Emoji message: %s', msg.text())
+                            // msg.toFileBox().then(fileBox => {
+                            //     LogUtils.debug('Voice/Emoji message: %s', fileBox?.name)
+                            //     fileBox.toFile(`storage/downloads/${fileBox?.name}`)
+                            // })
                             break;
                         case wxMsgType.Video:
                         case wxMsgType.File:

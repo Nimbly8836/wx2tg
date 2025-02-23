@@ -57,84 +57,72 @@ export class MessageService extends Singleton<MessageService> {
             const sendMessage = this.messageQueue.shift();
             let retryCount = sendMessage?.retriesNumber || 0;
 
-            this.prismaService.prisma.message.findFirst({
-                where: {wx_msg_id: sendMessage?.ext?.wxMsgId, from_wx_id: sendMessage?.fromWxId}
-            }).then(existingMessage => {
-                if (existingMessage) {
-                    sendMessage.success = true;
-                    sendMessage.isSending = false;
-                    return;
-                }
+            if (!sendMessage?.success && !sendMessage?.isSending && retryCount < this.maxRetries) {
+                sendMessage.isSending = true;
+                const client = this.clients.get(sendMessage.client);
 
-                if (!sendMessage?.success && !sendMessage?.isSending && retryCount < this.maxRetries) {
-                    sendMessage.isSending = true;
-                    const client = this.clients.get(sendMessage.client);
-
-                    client.sendMessage(sendMessage)
-                        .then(resMsg => {
-                            sendMessage.success = true;
-                            sendMessage.isSending = false;
+                client.sendMessage(sendMessage)
+                    .then(resMsg => {
+                        sendMessage.success = true;
+                        sendMessage.isSending = false;
 
 
-                            this.prismaService.prisma.message.create({
-                                data: {
-                                    from_wx_id: sendMessage.fromWxId,
-                                    content: sendMessage.content,
-                                    tg_msg_id: resMsg?.message_id,
-                                    wx_msg_id: sendMessage.ext?.wxMsgId,
-                                    parent_id: sendMessage.parentId,
-                                    wx_msg_user_name: sendMessage.wxMsgUserName,
-                                    wx_msg_text: sendMessage.ext?.wxMsgText,
-                                    wx_msg_type: sendMessage.wxMsgType,
-                                    wx_msg_type_text: sendMessage.wxMsgTypeText,
-                                    group: {
-                                        connect: {
-                                            tg_group_id: sendMessage.chatId,
-                                        }
+                        this.prismaService.prisma.message.create({
+                            data: {
+                                from_wx_id: sendMessage.fromWxId,
+                                content: sendMessage.content,
+                                tg_msg_id: resMsg?.message_id,
+                                wx_msg_id: sendMessage.ext?.wxMsgId,
+                                parent_id: sendMessage.parentId,
+                                wx_msg_user_name: sendMessage.wxMsgUserName,
+                                wx_msg_text: sendMessage.ext?.wxMsgText,
+                                wx_msg_type: sendMessage.wxMsgType,
+                                wx_msg_type_text: sendMessage.wxMsgTypeText,
+                                group: {
+                                    connect: {
+                                        tg_group_id: sendMessage.chatId,
                                     }
                                 }
-                            }).then(() => {
-                                LogUtils.debug('Message saved');
-                            }).catch(e => {
-                                LogUtils.error('Failed to save message', e, sendMessage);
-                            });
-                        }).catch(e => {
-                        LogUtils.error('Failed to send message', e);
-
-                        // Increment retry count and re-add to the queue for retry
-                        retryCount += 1;
-                        sendMessage.retriesNumber = retryCount;
-                        this.messageQueue.unshift(sendMessage);
-
-                        // Handle group upgrade to supergroup
-                        if (e.response?.error_code === 400 &&
-                            e.response?.description === 'Bad Request: group chat was upgraded to a supergroup chat') {
-                            const migrateToChatId = e?.response?.parameters?.migrate_to_chat_id;
-                            if (migrateToChatId) {
-                                // Update the group in the database asynchronously
-                                this.prismaService.prisma.group.update({
-                                    where: {tg_group_id: sendMessage.chatId},
-                                    data: {tg_group_id: Number(migrateToChatId)}
-                                }).then(() => {
-                                    // After migration, we process the queue again
-                                    this.processQueue();
-                                }).catch(groupUpdateError => {
-                                    LogUtils.error('Failed to update group', groupUpdateError);
-                                });
                             }
+                        }).then(() => {
+                            LogUtils.debug('Message saved');
+                        }).catch(e => {
+                            LogUtils.error('Failed to save message', e, sendMessage);
+                        });
+                    }).catch(e => {
+                    LogUtils.error('Failed to send message', e);
+
+                    // Increment retry count and re-add to the queue for retry
+                    retryCount += 1;
+                    sendMessage.retriesNumber = retryCount;
+                    this.messageQueue.unshift(sendMessage);
+
+                    // Handle group upgrade to supergroup
+                    if (e.response?.error_code === 400 &&
+                        e.response?.description === 'Bad Request: group chat was upgraded to a supergroup chat') {
+                        const migrateToChatId = e?.response?.parameters?.migrate_to_chat_id;
+                        if (migrateToChatId) {
+                            // Update the group in the database asynchronously
+                            this.prismaService.prisma.group.update({
+                                where: {tg_group_id: sendMessage.chatId},
+                                data: {tg_group_id: Number(migrateToChatId)}
+                            }).then(() => {
+                                // After migration, we process the queue again
+                                this.processQueue();
+                            }).catch(groupUpdateError => {
+                                LogUtils.error('Failed to update group', groupUpdateError);
+                            });
                         }
-                    }).finally(() => {
-                        // Stop retrying if max retries reached
-                        if (retryCount >= this.maxRetries) {
-                            LogUtils.error(`Max retries reached for message: ${sendMessage.content}`);
-                            sendMessage.isSending = false;
-                            sendMessage.success = false; // Mark as failed
-                        }
-                    });
-                }
-            }).catch(e => {
-                LogUtils.error('Error checking if message exists', e);
-            });
+                    }
+                }).finally(() => {
+                    // Stop retrying if max retries reached
+                    if (retryCount >= this.maxRetries) {
+                        LogUtils.error(`Max retries reached for message: ${sendMessage.content}`);
+                        sendMessage.isSending = false;
+                        sendMessage.success = false; // Mark as failed
+                    }
+                });
+            }
         }
     }
 

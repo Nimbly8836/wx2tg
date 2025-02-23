@@ -26,7 +26,6 @@ const originalExit = process.exit;
 // @ts-ignore
 process.exit = (code) => {
     if (code === 1) {
-
         WxClient.getInstance().check().then(check => {
             if (!check) {
                 botClient.sendMessage({

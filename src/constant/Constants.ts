@@ -6,4 +6,8 @@ export class Constants {
 
     public static DOWNLOAD_PATH = `${Constants.SAVE_PATH}/downloads`
 
+    public static GEWE_TEMP = '_gewetemp'
+
+
+    public static WX_FILE_CLIENT = 'storage/Wx2Tg_File_Client'
 }

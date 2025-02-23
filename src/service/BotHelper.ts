@@ -1,6 +1,5 @@
-import {Markup, Telegraf} from "telegraf";
-import {AbstractService, Singleton} from "../base/IService";
-import {SendMessage} from "../base/IMessage";
+import {Telegraf} from "telegraf";
+import {Singleton} from "../base/IService";
 import {MessageService} from "./MessageService";
 import {ClientEnum} from "../constant/ClientConstants";
 import {SimpleClientFactory} from "../base/Factory";
@@ -9,7 +8,7 @@ import {ConfigEnv} from "../config/Config";
 import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
 import {initPaginationCallback, PagedResult, registerPagination, sendPagedList} from "../util/PageHelper";
-import {wx_contact, wx_room, message as dbMessage} from "@prisma/client";
+import {wx_contact, wx_room} from "@prisma/client";
 import * as fs from "node:fs";
 import {message} from "telegraf/filters";
 import {LogUtils} from "../util/LogUtils";
@@ -18,9 +17,11 @@ import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
 import {updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {WxFileClient} from "../client/WxFileClient";
-import {Message} from "gewechaty";
 import {forward} from "../util/GewePostUtils";
-import FileUtils from "../util/FileUtils";
+import path, {join} from "node:path";
+import {MsgType} from "../base/IMessage";
+import {DownloadMediaInterface} from "telegram/client/downloads";
+import {TgMessageUtils} from "../util/TgMessageUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -28,6 +29,7 @@ export default class BotHelper extends Singleton<BotHelper> {
     private wxClient = WxClient.getInstance();
     private wxFileClient = WxFileClient.getInstance();
     private tgClient = TgClient.getInstance();
+    private messageService = MessageService.getInstance(MessageService);
 
     constructor() {
         super();
@@ -298,15 +300,52 @@ export default class BotHelper extends Singleton<BotHelper> {
             if (text.startsWith('/')) {
                 return;
             }
-            this.wxClient.sendMessage({
+            this.messageService.addMessages({
                 msgType: 'text',
                 chatId: ctx.chat.id,
                 content: text,
+            }, ClientEnum.WX_BOT)
+        })
+
+
+        bot.on(message('document'), async ctx => {
+            this.handlerFileMessages({
+                chatId: ctx.chat.id,
+                text: ctx.text,
+                message_id: ctx.message.message_id,
+                type: 'file'
             })
         })
 
-        bot.on(message('document'), ctx => {
-            // this.tgClient.
+        bot.on(message('photo'), async ctx => {
+            this.handlerFileMessages({
+                chatId: ctx.chat.id,
+                text: ctx.text,
+                message_id: ctx.message.message_id,
+                type: 'file'
+            })
+        })
+
+        bot.on(message('video'), async ctx => {
+            this.handlerFileMessages({
+                chatId: ctx.chat.id,
+                text: ctx.text,
+                message_id: ctx.message.message_id,
+                type: 'file' // 是用文件类型发送
+            })
+        })
+
+        bot.on(message('audio'), async ctx => {
+            this.handlerFileMessages({
+                chatId: ctx.chat.id,
+                text: ctx.text,
+                message_id: ctx.message.message_id,
+                type: 'file' // 是用文件类型发送
+            })
+        })
+
+        bot.on(message('voice'), async ctx => {
+            ctx.reply('暂不支持语音消息')
         })
 
     }
@@ -315,8 +354,22 @@ export default class BotHelper extends Singleton<BotHelper> {
     private setting(bot: Telegraf) {
         bot.settings(ctx => {
             // 获取数据库中的设置数据
-            this.prismaService.getConfigByToken().then(config => {
+            this.prismaService.getConfigByToken().then(async config => {
                 const settings = config.setting as SettingType
+                let needUpdate = false
+                for (let defaultSettingKey in defaultSetting) {
+                    if (!settings[defaultSettingKey]) {
+                        needUpdate = true
+                        settings[defaultSettingKey] = defaultSetting[defaultSettingKey]
+                    }
+                }
+
+                if (needUpdate) {
+                    await this.prismaService.prisma.config.update({
+                        where: {id: config.id},
+                        data: {setting: settings}
+                    })
+                }
 
                 const buttons = getButtons(settings);
 
@@ -647,7 +700,7 @@ export default class BotHelper extends Singleton<BotHelper> {
             if (!this.wxFileClient.hasLogin) {
                 this.wxFileClient.login().then(() => {
                 })
-                ctx.reply('请先登陆微信文件助手')
+                ctx.reply('请先登陆微信文件助手，然后重新点击下载')
                 ctx.answerCbQuery()
             } else {
                 const wxMsgId = ctx.match[1]
@@ -679,5 +732,42 @@ export default class BotHelper extends Singleton<BotHelper> {
                 })
             }
         })
+    }
+
+    handlerFileMessages(sendParams: {
+        chatId: number,
+        text: string,
+        message_id: number,
+        type?: string,
+    }) {
+        const {chatId, text, message_id, type} = sendParams
+        // 是自己发送的不处理
+        if (TgMessageUtils.popMessage(chatId, message_id)) {
+            return
+        }
+        if (text) {
+            this.messageService.addMessages({
+                msgType: 'text',
+                chatId: chatId,
+                content: text,
+            }, ClientEnum.WX_BOT)
+        }
+        let msgType: MsgType = 'file'
+        let downloadParams: DownloadMediaInterface = {}
+        this.tgClient.bot.getMessages(chatId, {ids: [message_id]})
+            .then(msgs => {
+                msgs.forEach(msg => {
+                    msg.downloadMedia(downloadParams)
+                        .then(file => {
+                            this.wxClient.sendMessage({
+                                msgType: msgType,
+                                chatId: chatId,
+                                content: '',
+                                file: file,
+                                fileName: msg.file.name,
+                            }).then()
+                        })
+                })
+            })
     }
 }
