@@ -36,6 +36,6 @@ COPY prisma/ /app/prisma
 
 RUN npm i
 RUN npm install -g typescript ts-node
-RUN tsc
+RUN npx tsc
 
 CMD [ "node", "dist/app.js" ]

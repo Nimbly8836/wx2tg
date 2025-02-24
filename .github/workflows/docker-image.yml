@@ -7,8 +7,12 @@ on:
       - v*
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64/v8]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,7 +39,7 @@ jobs:
       - name: Generate App Version
         run: echo APP_VERSION=`git describe --tags --always` >> $GITHUB_ENV
 
-      - name: Build and push
+      - name: Build and push for ${{ matrix.platform }}
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -44,7 +48,9 @@ jobs:
           tags: |
             xleat/wx2tg:latest
             xleat/wx2tg:${{ env.APP_VERSION }}
-          platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha  # Use GitHub Actions cache
+          cache-to: type=gha,mode=max  # Store cache for future runs
 
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
