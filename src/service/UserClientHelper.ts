@@ -10,7 +10,7 @@ import TgClient from "../client/TgClient";
 import {BigInteger} from "big-integer";
 import {returnBigInt} from "telegram/Helpers";
 
-export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, configId: number,resolve: Function) {
+export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, configId: number, resolve: Function) {
     // 选择查询表格
     const prismaService = PrismaService.getInstance(PrismaService);
     const query = wxMsg.isRoom ?
@@ -113,7 +113,7 @@ export async function updateGroupHeadImg(imageUrl: string, chatId: number) {
                 } else { // normal chat
                     tgUserClient.bot.invoke(
                         new Api.messages.EditChatPhoto({
-                            chatId: returnBigInt(chatId),
+                            chatId: returnBigInt(-chatId),
                             photo: new Api.InputChatUploadedPhoto({
                                 file: photo,
                             })
@@ -140,7 +140,7 @@ export async function updateGroupTitle(title: string, chatId: number) {
     } else {
         return tgUserClient.bot.invoke(
             new Api.messages.EditChatTitle({
-                chatId: returnBigInt(chatId),
+                chatId: returnBigInt(-chatId),
                 title: title,
             })
         ).then()

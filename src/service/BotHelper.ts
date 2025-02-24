@@ -18,7 +18,6 @@ import {updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {WxFileClient} from "../client/WxFileClient";
 import {forward} from "../util/GewePostUtils";
-import path, {join} from "node:path";
 import {MsgType} from "../base/IMessage";
 import {DownloadMediaInterface} from "telegram/client/downloads";
 import {TgMessageUtils} from "../util/TgMessageUtils";
@@ -48,8 +47,12 @@ export default class BotHelper extends Singleton<BotHelper> {
             {command: 'roomml', description: '查看群组成员信息'},
             {command: 'sync', description: '同步群组/联系人信息'},
             {command: 'info', description: '查看当前群信息'},
-            {command: 'check', description: '检查微信是否在线（可能不准确）'},
+            {command: 'check', description: '检查微信是否在线（不准确）'},
             {command: 'sc', description: '搜索聊天记录内容，在群组使用只搜索当前群组'},
+            {command: 'fu', description: '强制更新群组信息（名称和头像）'},
+            {command: 'sw', description: '切换当前群组转发状态'},
+            {command: 'al', description: '暂时未实现！！添加允许转发的id，在当前群组中能转发消息的id。说明请看帮助文档'}
+
         ]
 
         bot.telegram.setMyCommands(commands)
@@ -73,7 +76,7 @@ export default class BotHelper extends Singleton<BotHelper> {
                 ctx.message?.from.id !== ownerId &&
                 ctx.callbackQuery?.from.id !== ownerId) {
                 if (ctx.callbackQuery) {
-                    ctx.answerCbQuery('你没有权限')
+                    await ctx.answerCbQuery('你没有权限')
                 }
                 return
             }
@@ -99,6 +102,9 @@ export default class BotHelper extends Singleton<BotHelper> {
 /user 搜索微信联系人，支持昵称、备注,及其全缩写的大写和小写的全拼
 /room 搜索群组，同上
 /sc 搜索聊天记录内容
+user & room 命令在群组使用，能切换当前绑定的用户或者绑定当前群组
+/al 命令添加允许当前群组能转发的用户的id，添加 1 是所有人都能转发，在1存在的时候可以在id前面加 - 不允许转发
+如：[1, -123, -124, 125] 这时候所有的人除了 -123 -124 的消息不转发，其他人的消息都转发；没有1的时候 -id 没有意义
 
 更多功能请查看 GitHub`, {
                 parse_mode: 'HTML',
@@ -192,81 +198,28 @@ export default class BotHelper extends Singleton<BotHelper> {
         })
 
         bot.command('sync', async (ctx) => {
+            this.syncInfo(ctx);
+        })
+
+        bot.command('fu', async (ctx) => {
+            this.syncInfo(ctx, true);
+        })
+
+        // 切换当前群组的转发状态
+        bot.command('sw', async (ctx) => {
             this.prismaService.prisma.group.findUniqueOrThrow({
                 where: {tg_group_id: ctx.chat.id}
-            }).then((group) => {
-                if (group.is_wx_room) {
-                    // @ts-ignore
-                    this.wxClient.bot.Room.find({id: group.wx_id}).then(findWxRoom => {
-                        findWxRoom.sync().then(syncedRoom => {
-                            LogUtils.debug('syncedRoom', syncedRoom)
-                            this.prismaService.syncRoomDb(syncedRoom.chatroomId)
-                            // 更新头像
-                            if (syncedRoom.avatarImg !== group.headImgUrl) {
-                                this.prismaService.prisma.group.update({
-                                    where: {id: group.id},
-                                    data: {
-                                        headImgUrl: syncedRoom.avatarImg
-                                    }
-                                }).then()
-                                updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
-                                    .then()
-                            }
-                            // 更新名称
-                            if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
-                                this.prismaService.prisma.group.update({
-                                    where: {id: group.id},
-                                    data: {
-                                        group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
-                                    }
-                                }).then()
-                                updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
-                                    .then()
-                            }
-                            ctx.reply('同步成功')
-                        }).catch(e => {
-                            LogUtils.error('syncRoom', e)
-                            ctx.reply('同步失败')
-                        })
-                    })
-
-                } else {
-                    this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
-                        findWxContact.sync().then(syncedContact => {
-                            LogUtils.debug('syncedContact', syncedContact)
-                            // 更新头像
-                            if (syncedContact._avatarUrl !== group.headImgUrl) {
-                                this.prismaService.prisma.group.update({
-                                    where: {id: group.id},
-                                    data: {
-                                        headImgUrl: syncedContact._avatarUrl
-                                    }
-                                }).then()
-                                updateGroupHeadImg(syncedContact._avatarUrl, ctx.chat.id)
-                                    .then()
-                            }
-                            // 更新名称
-                            if (syncedContact._alias !== group.group_name && syncedContact._name !== group.group_name) {
-                                this.prismaService.prisma.group.update({
-                                    where: {id: group.id},
-                                    data: {
-                                        group_name: syncedContact._alias ? syncedContact._alias : syncedContact._name
-                                    }
-                                }).then()
-                                updateGroupTitle(syncedContact._alias ? syncedContact._alias : syncedContact._name, ctx.chat.id)
-                                    .then()
-                            }
-                            this.prismaService.syncContactDb(syncedContact._wxid)
-                        }).catch(e => {
-                            LogUtils.error('syncContact', e)
-                            ctx.reply('同步失败')
-                        })
-                        ctx.reply('同步成功')
-                    })
-                }
-            }).catch(e => {
-                ctx.reply('没绑定当前群组')
-                this.prismaService.createOrUpdateWxConcatAndRoom()
+            }).then(group => {
+                this.prismaService.prisma.group.update({
+                    where: {id: group.id},
+                    data: {
+                        forward: !group.forward
+                    }
+                }).then(() => {
+                    ctx.reply('切换成功,当前群组转发状态：' + (!group.forward ? '开启' : '关闭'))
+                })
+            }).catch(() => {
+                ctx.reply('当前群组未绑定')
             })
         })
 
@@ -300,6 +253,12 @@ export default class BotHelper extends Singleton<BotHelper> {
             if (text.startsWith('/')) {
                 return;
             }
+            const group = await this.prismaService.prisma.group.findUnique({
+                where: {tg_group_id: ctx.chat.id}
+            })
+            if (!group?.forward) {
+                return
+            }
             this.messageService.addMessages({
                 msgType: 'text',
                 chatId: ctx.chat.id,
@@ -322,7 +281,7 @@ export default class BotHelper extends Singleton<BotHelper> {
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
-                type: 'file'
+                type: 'image'
             })
         })
 
@@ -734,7 +693,7 @@ export default class BotHelper extends Singleton<BotHelper> {
         })
     }
 
-    handlerFileMessages(sendParams: {
+    async handlerFileMessages(sendParams: {
         chatId: number,
         text: string,
         message_id: number,
@@ -745,6 +704,12 @@ export default class BotHelper extends Singleton<BotHelper> {
         if (TgMessageUtils.popMessage(chatId, message_id)) {
             return
         }
+        const group = await this.prismaService.prisma.group.findUnique({
+            where: {tg_group_id: chatId}
+        })
+        if (!group.forward) {
+            return
+        }
         if (text) {
             this.messageService.addMessages({
                 msgType: 'text',
@@ -752,22 +717,103 @@ export default class BotHelper extends Singleton<BotHelper> {
                 content: text,
             }, ClientEnum.WX_BOT)
         }
-        let msgType: MsgType = 'file'
+        let msgType: MsgType = type as MsgType ?? 'file'
         let downloadParams: DownloadMediaInterface = {}
         this.tgClient.bot.getMessages(chatId, {ids: [message_id]})
             .then(msgs => {
                 msgs.forEach(msg => {
                     msg.downloadMedia(downloadParams)
                         .then(file => {
+                            const mimeTypeSplit = msg.file.mimeType?.split('/');
                             this.wxClient.sendMessage({
                                 msgType: msgType,
                                 chatId: chatId,
                                 content: '',
                                 file: file,
-                                fileName: msg.file.name,
+                                fileName: msg.file.name
+                                    ?? `${chatId}-${msg.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`,
                             }).then()
                         })
                 })
             })
+    }
+
+    private syncInfo(ctx, force = false) {
+        this.prismaService.prisma.group.findUniqueOrThrow({
+            where: {tg_group_id: ctx.chat.id}
+        }).then((group) => {
+            if (group.is_wx_room) {
+                // @ts-ignore
+                this.wxClient.bot.Room.find({id: group.wx_id}).then(findWxRoom => {
+                    findWxRoom.sync().then(syncedRoom => {
+                        LogUtils.debug('syncedRoom', syncedRoom)
+                        this.prismaService.syncRoomDb(syncedRoom.chatroomId)
+                        // 更新头像
+                        if (force || syncedRoom.avatarImg !== group.headImgUrl) {
+                            this.prismaService.prisma.group.update({
+                                where: {id: group.id},
+                                data: {
+                                    headImgUrl: syncedRoom.avatarImg
+                                }
+                            }).then()
+                            updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
+                                .then()
+                        }
+                        // 更新名称
+                        if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
+                            this.prismaService.prisma.group.update({
+                                where: {id: group.id},
+                                data: {
+                                    group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
+                                }
+                            }).then()
+                            updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
+                                .then()
+                        }
+                        ctx.reply('同步成功')
+                    }).catch(e => {
+                        LogUtils.error('syncRoom', e)
+                        ctx.reply('同步失败')
+                    })
+                })
+
+            } else {
+                this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
+                    findWxContact.sync().then(syncedContact => {
+                        LogUtils.debug('syncedContact', syncedContact)
+                        // 更新头像
+                        if (force || syncedContact._avatarUrl !== group.headImgUrl) {
+                            this.prismaService.prisma.group.update({
+                                where: {id: group.id},
+                                data: {
+                                    headImgUrl: syncedContact._avatarUrl
+                                }
+                            }).then()
+                            updateGroupHeadImg(syncedContact._avatarUrl, ctx.chat.id)
+                                .then()
+                        }
+                        // 更新名称
+                        if (syncedContact._alias !== group.group_name && syncedContact._name !== group.group_name) {
+                            this.prismaService.prisma.group.update({
+                                where: {id: group.id},
+                                data: {
+                                    group_name: syncedContact._alias ? syncedContact._alias : syncedContact._name
+                                }
+                            }).then()
+                            updateGroupTitle(syncedContact._alias ? syncedContact._alias : syncedContact._name, ctx.chat.id)
+                                .then()
+                        }
+                        this.prismaService.syncContactDb(syncedContact._wxid)
+                    }).catch(e => {
+                        LogUtils.error('syncContact', e)
+                        ctx.reply('同步失败')
+                    })
+                    ctx.reply('同步成功')
+                })
+            }
+        }).catch(e => {
+            ctx.reply('没绑定当前群组')
+            this.prismaService.createOrUpdateWxConcatAndRoom()
+        })
     }
 }

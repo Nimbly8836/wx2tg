@@ -8,12 +8,24 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         platform: [ linux/amd64, linux/arm64/v8, linux/arm/v7 ]
+        include:
+          - platform: linux/amd64
+            QEMU_ARCH: x86_64
+          - platform: linux/arm64/v8
+            QEMU_ARCH: aarch64
+          - platform: linux/arm/v7
+            QEMU_ARCH: arm
 
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -33,14 +45,21 @@ jobs:
         uses: actions/setup-node@v4.2.0
         with:
           node-version: 20.18.3
-          cache: npm
-          cache-dependency-path: package-lock.json
+
+      - name: Cache Node.js modules
+        id: cache-node-modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-${{ matrix.platform }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-node-modules-    
 
       - name: Generate App Version
         run: echo APP_VERSION=`git describe --tags --always` >> $GITHUB_ENV
 
       - name: Build and push for ${{ matrix.platform }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile

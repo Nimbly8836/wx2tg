@@ -296,6 +296,10 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
             }
             await this.createGroup(msg, config).then(async (res) => {
                 if (res) {
+                    // 当前群组转发状态
+                    if (!res.forward) {
+                        return
+                    }
                     const chatId = Number(res.tg_group_id);
                     let content = msg.text()
                     let title

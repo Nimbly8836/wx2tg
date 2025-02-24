@@ -9,8 +9,6 @@ import WxMessageHelper from "../service/WxMessageHelper";
 import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
-import FileUtils from "../util/FileUtils";
-import {join} from "node:path";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -117,8 +115,9 @@ export class WxClient extends AbstractClient<GeweBot> {
                         case "file":
                         case "audio":
                         case "image":
+                            const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
                             const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
-                                msgParams.fileName, 'file')
+                                msgParams.fileName, forceType)
                             to.say(fileBox).then(resolve)
                             break;
                         default:
