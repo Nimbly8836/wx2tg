@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "LOG_LEVEL=pro tsc && node dist/app.js",
+    "start": "npm run init-db && tsc && LOG_LEVEL=pro node dist/app.js",
     "init-db": "prisma migrate dev --name init"
   },
   "keywords": [
@@ -39,7 +39,6 @@
     "simple-xml-to-json": "^1.2.2",
     "socks-proxy-agent": "^7.0.0",
     "sqlite3": "^5.1.7",
-    "table": "^6.9.0",
     "telegraf": "^4.12.2",
     "telegram": "^2.21.2",
     "tencentcloud-sdk-nodejs": "^4.0.977",

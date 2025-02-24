@@ -1,0 +1,37 @@
+services:
+  wx2tg:
+    image: localhost/wx2tg:latest
+    container_name: wx2tg
+    env_file:
+      - .env.docker
+    volumes: # 示例，换成你的 volumes
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  gewe:
+    image: xleat/gewe:alpine
+    container_name: gewe
+    volumes: # 示例，换成你的 volumes
+      - ./temp:/root/temp
+    ports: # 调试用
+      - "2531:2531"
+      - "2532:2532"
+    restart: unless-stopped
+
+  wx2tg-db:
+    image: postgres
+    container_name: wx2tg-db
+    restart: unless-stopped
+    volumes: # 示例，换成你的 volumes
+      - ./data/db:/var/lib/postgresql/data
+    ports: # 调试暴露端口
+      - "35432:5432"
+    environment:
+      POSTGRES_PASSWORD: example # 记得修改 POSTGRES 的密码
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+
+networks:
+  wx2tg_net:
+    driver: bridge

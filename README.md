@@ -26,6 +26,29 @@
 
 其他正在开发中...
 
+## 部署
+
+注意事项：
+1. Gewechat 服务必须在和你同省
+2. 必须使用 Telegram 的 API_ID & API_HASE，请注意使用 User Bot 可能会增加你被封号的概率
+3. 数据库使用 PG 数据库
+
+docker-compose 运行：
+1. 复制 .env.example 到 .env 并且修改你的配置
+2. 运行
+
+```shell
+docker compose up -d
+
+docker-compose up -d
+
+podman-compose -f compose.yaml up -d
+```
+
+## 使用
+
+
+
 
 ## 开发
 
@@ -34,6 +57,8 @@
 ```shell
 npm install
 ```
+
+node 要 20 以上
 
 2. 修改配置文件
 

@@ -31,6 +31,7 @@ export class WxClient extends AbstractClient<GeweBot> {
             proxy: ConfigEnv.GEWE_PROXY,
             // debug: false,
             cache_path: 'storage/gewe',
+            ip: ConfigEnv.GEWE_IP,
         })
     }
 

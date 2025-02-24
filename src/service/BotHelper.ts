@@ -39,17 +39,17 @@ export default class BotHelper extends Singleton<BotHelper> {
         const commands = [
             {command: 'start', description: '开始，登陆 TG User Client'},
             {command: 'help', description: '帮助信息'},
-            {command: 'setting', description: '设置'},
+            {command: 'settings', description: '设置'},
             {command: 'login', description: '登录微信'},
             {command: 'logout', description: '登出微信'},
             {command: 'rmds', description: '删除微信登录的缓存文件'},
             {command: 'user', description: '查看联系人，支持昵称、备注、全缩写大写、小写全拼查询'},
             {command: 'room', description: '查看群组，支持昵称和备注查询'},
-            {command: 'roomml', description: '查看群组成员'},
+            {command: 'roomml', description: '查看群组成员信息'},
             {command: 'sync', description: '同步群组/联系人信息'},
             {command: 'info', description: '查看当前群信息'},
-            {command: 'check', description: '检查微信是否在线'},
-            {command: 'sc', description: '搜索聊天记录内容'},
+            {command: 'check', description: '检查微信是否在线（可能不准确）'},
+            {command: 'sc', description: '搜索聊天记录内容，在群组使用只搜索当前群组'},
         ]
 
         bot.telegram.setMyCommands(commands)

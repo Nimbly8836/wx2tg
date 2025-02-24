@@ -15,14 +15,13 @@ RUN conan install . --build=missing -s build_type=Release
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DLOTTIE_MODULE=OFF CMakeLists.txt && cmake --build . --config Release
 COPY --from=builder-gifski /usr/local/cargo/bin/gifski /usr/bin/gifski
 
-FROM node:18-slim
+FROM node:20
 
 RUN apt update && apt-get --no-install-recommends install -y \
-    fonts-wqy-microhei \
     libpixman-1-0 libcairo2 libpango1.0-0 libgif7 libjpeg62-turbo libpng16-16 librsvg2-2 libvips42 librlottie0-1 \
-    python3 make gcc g++
+    && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /app/storage /app/save-files
+RUN mkdir -p /app/storage /app/logs
 
 WORKDIR /app
 COPY --from=builder-gifski /usr/local/cargo/bin/gifski /usr/bin/gifski
@@ -30,10 +29,13 @@ COPY --from=builder-lottie-to-png /application/bin/lottie_to_png /usr/bin/lottie
 COPY --from=builder-lottie-to-png /application/bin/lottie_common.sh /usr/bin
 COPY --from=builder-lottie-to-png /application/bin/lottie_to_gif.sh /usr/bin
 RUN chmod +x /usr/bin/lottie_to_png /usr/bin/lottie_common.sh /usr/bin/lottie_to_gif.sh
+
 COPY package*.json tsconfig.json ./
+COPY src/ /app/src
+COPY prisma/ /app/prisma
 
-RUN npm install -g npm@10.7.0 && npm install
+RUN npm i
+RUN npm install -g typescript ts-node
+RUN tsc
 
-COPY . .
-
-CMD [ "npm", "start" ]
+CMD [ "node", "dist/app.js" ]
