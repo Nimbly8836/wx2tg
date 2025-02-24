@@ -186,7 +186,9 @@ export class WxClient extends AbstractClient<GeweBot> {
                 }
                 // 只处理登录之后的消息 且不是发送给文件助手的消息
                 // 没有类型的消息不处理，大多是通知或者无法处理的消息
-                if (msg._createTime >= this.loginTime && msg.toId !== Constants.FILE_HELPER && msg.type()) {
+                if (msg._createTime >= this.loginTime
+                    && msg.toId !== Constants.FILE_HELPER
+                    && msg.type()) {
                     this.wxMessageHelper.sendMessages(msg).then()
                 }
             }

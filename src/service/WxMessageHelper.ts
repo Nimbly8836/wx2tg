@@ -79,6 +79,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
         }
         return new Promise(async (resolve, reject) => {
 
+            // 重复的消息不处理，经过一段时间还是有可能有重复的消息
+
             this.prismaService.prisma.group.findUnique({
                 where: {
                     config_id_wx_id: {
@@ -130,53 +132,63 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         })
                     })
                 } else {
-                    if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
-                        await this.prismaService.createOrUpdateWxConcatAndRoom()
-                        // 重新查询
-                        if (msg.isRoom) {
-                            this.prismaService.prisma.wx_room.findUnique({
-                                where: {
-                                    wx_id_chatroomId: {
-                                        wx_id: msg.wxid,
-                                        chatroomId: wxId,
-                                    }
-                                },
-                            }).then((roomInPg => {
-                                if (roomInPg) {
-                                    existGroup.wx_room_id = roomInPg.id
-                                    this.prismaService.prisma.group.update({
-                                        where: {id: existGroup.id},
-                                        data: {
-                                            wx_room_id: roomInPg.id,
-                                        }
-                                    }).then()
-                                    resolve(existGroup)
-                                }
-                            }))
+                    // 重复的消息不处理，经过一段时间还是有可能有重复的消息
+                    this.prismaService.prisma.message.findFirst({
+                        where: {wx_msg_id: msg._newMsgId, group_id: existGroup.id},
+                    }).then(async (message) => {
+                        if (message) {
+                            LogUtils.debug('重复消息 id: %s', message.id)
+                            resolve(existGroup)
                         } else {
-                            this.prismaService.prisma.wx_contact.findUnique({
-                                where: {
-                                    wx_id_userName: {
-                                        wx_id: msg.wxid,
-                                        userName: wxId,
-                                    }
-                                }
-                            }).then((contactInPg => {
-                                if (contactInPg) {
-                                    existGroup.wx_contact_id = contactInPg.id
-                                    this.prismaService.prisma.group.update({
-                                        where: {id: existGroup.id},
-                                        data: {
-                                            wx_contact_id: contactInPg.id,
+                            if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
+                                await this.prismaService.createOrUpdateWxConcatAndRoom()
+                                // 重新查询
+                                if (msg.isRoom) {
+                                    this.prismaService.prisma.wx_room.findUnique({
+                                        where: {
+                                            wx_id_chatroomId: {
+                                                wx_id: msg.wxid,
+                                                chatroomId: wxId,
+                                            }
+                                        },
+                                    }).then((roomInPg => {
+                                        if (roomInPg) {
+                                            existGroup.wx_room_id = roomInPg.id
+                                            this.prismaService.prisma.group.update({
+                                                where: {id: existGroup.id},
+                                                data: {
+                                                    wx_room_id: roomInPg.id,
+                                                }
+                                            }).then()
+                                            resolve(existGroup)
                                         }
-                                    }).then()
-                                    resolve(existGroup)
+                                    }))
+                                } else {
+                                    this.prismaService.prisma.wx_contact.findUnique({
+                                        where: {
+                                            wx_id_userName: {
+                                                wx_id: msg.wxid,
+                                                userName: wxId,
+                                            }
+                                        }
+                                    }).then((contactInPg => {
+                                        if (contactInPg) {
+                                            existGroup.wx_contact_id = contactInPg.id
+                                            this.prismaService.prisma.group.update({
+                                                where: {id: existGroup.id},
+                                                data: {
+                                                    wx_contact_id: contactInPg.id,
+                                                }
+                                            }).then()
+                                            resolve(existGroup)
+                                        }
+                                    }))
                                 }
-                            }))
+                            } else {
+                                resolve(existGroup)
+                            }
                         }
-                    } else {
-                        resolve(existGroup)
-                    }
+                    })
                     // 检查头像是否需要更新
                     // 自己发的消息不更新头像
                     if (msg._self) {
@@ -420,27 +432,44 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                         })
                                     }
 
+                                    // 这里有可能是消息还没保存到数据库，所以 tgGroupId 为空
+                                    if (!tgGroupId) {
+                                        setTimeout(() => {
+                                            editMsgImage(fileBox)
+                                        }, 1000)
+                                    }
+
                                 })
                             }
 
-                            msg.toFileBox(1).then(fileBox1 => {
-                                // 没有的情况下
-                                if (!fileBox1 || fileBox1.url == ConfigEnv.FILE_API) {
-                                    msg.toFileBox(2).then(fileBox2 => {
-                                        if (!fileBox2 || fileBox2.url == ConfigEnv.FILE_API) {
-                                            msg.toFileBox(3).then(fileBox3 => {
-                                                if (fileBox3?.url != ConfigEnv.FILE_API) {
-                                                    editMsgImage(fileBox3)
-                                                }
-                                            })
-                                        } else {
-                                            editMsgImage(fileBox2)
+                            const processFileBox = (msg: Message) => {
+                                const getFileBox = async (type: number) => {
+                                    try {
+                                        let fileBox = await msg.toFileBox(type);
+                                        if (fileBox?.url !== ConfigEnv.FILE_API) {
+                                            editMsgImage(fileBox);
+                                            return true;  // 返回成功标志
                                         }
+                                        return false;  // 文件API路径，继续尝试
+                                    } catch (e) {
+                                        return false;  // 获取文件失败，继续尝试
+                                    }
+                                };
+
+                                // 尝试依次获取文件，优先顺序为 1 -> 2 -> 3
+                                getFileBox(1)
+                                    .then(success1 => {
+                                        if (!success1) return getFileBox(2);
                                     })
-                                } else {
-                                    editMsgImage(fileBox1)
-                                }
-                            })
+                                    .then(success2 => {
+                                        if (!success2) return getFileBox(3);
+                                    })
+                                    .catch(() => {
+                                        LogUtils.error("No valid file found");
+                                    });
+                            }
+
+                            processFileBox(msg)
                             break;
                         case wxMsgType.Voice:
                             break;
