@@ -28,26 +28,9 @@ jobs:
       - name: Setup Node.js environment
         uses: actions/setup-node@v4.2.0
         with:
-          # Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.
           node-version: 20.18.3
-          # File containing the version Spec of the version to use.  Examples: package.json, .nvmrc, .node-version, .tool-versions.
-          node-version-file: package.json
-          # Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.
           cache: npm
-          # Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.
           cache-dependency-path: package-lock.json
-          
-
-      #      - name: Create cache directory
-      #        run: mkdir -p /tmp/.buildx-cache
-      #
-      #      - name: Cache Docker layers
-      #        uses: actions/cache@v2
-      #        with:
-      #          path: /tmp/.buildx-cache
-      #          key: ${{ runner.os }}-buildx-${{ github.sha }}
-      #          restore-keys: |
-      #            ${{ runner.os }}-buildx-
 
       - name: Generate App Version
         run: echo APP_VERSION=`git describe --tags --always` >> $GITHUB_ENV
@@ -62,14 +45,12 @@ jobs:
             xleat/wx2tg:latest
             xleat/wx2tg:${{ env.APP_VERSION }}
           platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
-      #          cache-from: type=local,src=/tmp/.buildx-cache
-      #          cache-to: type=local,mode=max,dest=/tmp/.buildx-cache
 
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          repository: finalpi/wechat2tg-pad
+          repository: xleat/wx2tg
           readme-filepath: ./README.md
           short-description: 'telegram收发微信消息'
