@@ -9,33 +9,99 @@ import WxMessageHelper from "./WxMessageHelper";
 import TgClient from "../client/TgClient";
 import {BigInteger} from "big-integer";
 import {returnBigInt} from "telegram/Helpers";
+import {addToGroupIds} from "../util/CacheUtils";
 
-export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId: number, configId: number, resolve: Function) {
-    // 选择查询表格
+export function createChannel(createGroupParams: {
+    isRoom: boolean,
+    loginWxId: string,
+    roomId: string,
+    fromId: string,
+    configId: number,
+    channelId: number,
+    title: string
+}, users: Api.TypeEntityLike[], resolve: Function) {
+    const tgUserClient = TgClient.getInstance();
+    const {title} = createGroupParams
+    tgUserClient.bot?.invoke(
+        new Api.messages.CreateChat({
+            users: users,
+            title: title,
+            ttlPeriod: 0
+        })
+    ).then(result => {
+        LogUtils.info('创建普通群组成功', title)
+        // 升级成超级群组
+        tgUserClient.bot?.invoke(
+            new Api.messages.MigrateChat({
+                // @ts-ignore
+                chatId: result.updates?.chats[0]?.id,
+            })
+        ).then(async (res) => {
+            LogUtils.info('升级超级群组成功', title)
+            if (res instanceof Api.Updates) {
+                const channelId = res.chats.find(it => {
+                    return it instanceof Api.Channel
+                })?.id
+
+                if (channelId) {
+                    // 添加监听群组
+                    addToGroupIds(channelId.toJSNumber())
+                    tgUserClient.bot.invoke(
+                        new Api.channels.TogglePreHistoryHidden({
+                            channel: channelId,
+                            enabled: false,
+                        })
+                    ).then(() => {
+                        LogUtils.info('TogglePreHistoryHidden', title)
+                        createGroupParams.channelId = Number(-100 + channelId.toString());
+                        insertDbUpdateAvatar(createGroupParams, resolve)
+                    })
+                    LogUtils.debug('createGroup result : %s', JSON.stringify(result.toJSON()))
+                } else {
+                    LogUtils.debug('升级群组设置权限错误')
+                }
+
+            }
+        })
+    })
+}
+
+export function insertDbUpdateAvatar(createGroupParams: {
+    isRoom: boolean,
+    loginWxId: string,
+    roomId: string,
+    fromId: string,
+    configId: number,
+    channelId: number,
+    title: string
+}, resolve: Function) {
+
+    const {isRoom, loginWxId, roomId, fromId, configId, channelId, title} = createGroupParams
+
     const prismaService = PrismaService.getInstance(PrismaService);
-    const query = wxMsg.isRoom ?
+    const query = isRoom ?
         prismaService.prisma.wx_room.findUnique({
             where: {
                 wx_id_chatroomId: {
-                    wx_id: wxMsg.wxid,
-                    chatroomId: wxMsg.roomId,
+                    wx_id: loginWxId,
+                    chatroomId: roomId,
                 },
             }
         }) :
         prismaService.prisma.wx_contact.findUnique({
             where: {
                 wx_id_userName: {
-                    wx_id: wxMsg.wxid,
-                    userName: wxMsg.fromId,
+                    wx_id: loginWxId,
+                    userName: fromId,
                 },
             }
         });
 
     const createGroup = {
-        wx_id: wxMsg.isRoom ? wxMsg.roomId : wxMsg.fromId,
+        wx_id: isRoom ? roomId : fromId,
         tg_group_id: channelId,
         group_name: title,
-        is_wx_room: wxMsg.isRoom,
+        is_wx_room: isRoom,
         config_id: configId,
     };
 
@@ -44,16 +110,16 @@ export function createGroupWithHeadImg(wxMsg: Message, title: string, channelId:
         prismaService.prisma.group.create({
             data: {
                 ...createGroup,
-                headImgUrl: wxMsg.isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl,
-                wx_contact_id: wxMsg.isRoom ? null : entity?.id,
-                wx_room_id: wxMsg.isRoom ? entity?.id : null,
+                headImgUrl: isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl,
+                wx_contact_id: isRoom ? null : entity?.id,
+                wx_room_id: isRoom ? entity?.id : null,
             },
         }).then((res) => {
             // 将群组添加到文件夹
             addToFolder(Number(res.tg_group_id)).then(() => {
                 // 检查并上传头像
-                const headImgUrl = wxMsg.isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl;
-                updateGroupHeadImg(headImgUrl, channelId);
+                const headImgUrl = isRoom ? entity?.smallHeadImgUrl : entity?.bigHeadImgUrl;
+                updateGroupHeadImg(headImgUrl, channelId).then();
             })
             resolve(res);
         })

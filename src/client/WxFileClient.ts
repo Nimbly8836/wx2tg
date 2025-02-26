@@ -11,7 +11,6 @@ import {Constants} from "../constant/Constants";
 import TgClient from "./TgClient";
 import {ConfigEnv} from "../config/Config";
 import {TgMessageUtils} from "../util/TgMessageUtils";
-import {LogUtils} from "../util/LogUtils";
 
 
 export class WxFileClient extends AbstractClient<Wechaty> {

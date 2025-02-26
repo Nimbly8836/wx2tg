@@ -28,15 +28,15 @@ export abstract class AbstractClient<T> implements IClient, IService {
     abstract onMessage(any: any): void
 
     logDebug(message: any, ...args: any[]): void {
-        this.logger.debug(message, ...args);
+        this.logger?.debug(message, ...args);
     }
 
     logError(message: any, ...args: any[]): void {
-        this.logger.error(message, ...args);
+        this.logger?.error(message, ...args);
     }
 
     logInfo(message: any, ...args: any[]): void {
-        this.logger.info(message, ...args);
+        this.logger?.info(message, ...args);
     }
 
 }

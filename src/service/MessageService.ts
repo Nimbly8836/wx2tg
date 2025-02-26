@@ -85,12 +85,12 @@ export class MessageService extends Singleton<MessageService> {
                                 }
                             }
                         }).then(() => {
-                            LogUtils.debug('Message saved');
+                            this.logDebug('Message saved');
                         }).catch(e => {
-                            LogUtils.error('Failed to save message', e, sendMessage);
+                            this.logError('Failed to save message', e, sendMessage);
                         });
                     }).catch(e => {
-                    LogUtils.error('Failed to send message', e);
+                    this.logError('Failed to send message', e);
 
                     // Increment retry count and re-add to the queue for retry
                     retryCount += 1;
@@ -110,7 +110,7 @@ export class MessageService extends Singleton<MessageService> {
                                 // After migration, we process the queue again
                                 this.processQueue();
                             }).catch(groupUpdateError => {
-                                LogUtils.error('Failed to update group', groupUpdateError);
+                                this.logError('Failed to update group', groupUpdateError);
                             });
                         }
                     }
@@ -125,7 +125,7 @@ export class MessageService extends Singleton<MessageService> {
                 }).finally(() => {
                     // Stop retrying if max retries reached
                     if (retryCount >= this.maxRetries) {
-                        LogUtils.error(`Max retries reached for message: ${sendMessage.content}`)
+                        this.logError(`Max retries reached for message: ${sendMessage.content}`)
                         sendMessage.isSending = false
                         sendMessage.success = false // Mark as failed
                     }

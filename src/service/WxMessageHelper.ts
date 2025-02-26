@@ -13,7 +13,7 @@ import {SendMessage} from "../base/IMessage";
 import FileUtils from "../util/FileUtils";
 import {SettingType} from "../util/SettingUtils";
 import {CustomFile} from "telegram/client/uploads";
-import {createGroupWithHeadImg} from "./UserClientHelper";
+import {createChannel, insertDbUpdateAvatar} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
@@ -90,55 +90,26 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
             }).then(async existGroup => {
                 if (!existGroup) {
                     const title = await this.getTitle(msg) || 'wx2tg_未命名群组';
-                    this.tgUserClient.bot?.invoke(
-                        new Api.messages.CreateChat({
-                            users: [Number(config.bot_chat_id), Number(config.bot_id)],
-                            title: title,
-                            ttlPeriod: 0
-                        })
-                    ).then(result => {
-                        LogUtils.info('创建普通群组成功', title)
-                        // 升级成超级群组
-                        this.tgUserClient.bot?.invoke(
-                            new Api.messages.MigrateChat({
-                                // @ts-ignore
-                                chatId: result.updates?.chats[0]?.id,
-                            })
-                        ).then(async (res) => {
-                            LogUtils.info('升级超级群组成功', title)
-                            if (res instanceof Api.Updates) {
-                                const channelId = res.chats.find(it => {
-                                    return it instanceof Api.Channel
-                                })?.id
-
-                                if (channelId) {
-                                    // 添加监听群组
-                                    addToGroupIds(channelId.toJSNumber())
-                                    this.tgUserClient.bot.invoke(
-                                        new Api.channels.TogglePreHistoryHidden({
-                                            channel: channelId,
-                                            enabled: false,
-                                        })
-                                    ).then(() => {
-                                        LogUtils.info('TogglePreHistoryHidden', title)
-                                        const tgGroupId = Number(-100 + channelId.toString());
-                                        createGroupWithHeadImg(msg, title, tgGroupId, config.id, resolve)
-                                    })
-                                    LogUtils.debug('createGroup result : %s', JSON.stringify(result.toJSON()))
-                                } else {
-                                    LogUtils.error('升级群组设置权限错误')
-                                }
-
-                            }
-                        })
-                    })
+                    const createGroupParams = {
+                        isRoom: msg.isRoom,
+                        loginWxId: msg.wxid,
+                        roomId: msg.roomId,
+                        fromId: msg.fromId,
+                        configId: config.id,
+                        channelId: 0,
+                        title: title,
+                    }
+                    createChannel(
+                        createGroupParams,
+                        [Number(config.bot_chat_id), Number(config.bot_id)],
+                        resolve)
                 } else {
                     // 重复的消息不处理，经过一段时间还是有可能有重复的消息
                     this.prismaService.prisma.message.findFirst({
                         where: {wx_msg_id: msg._newMsgId, group_id: existGroup.id},
                     }).then(async (message) => {
                         if (message) {
-                            LogUtils.debug('重复消息 id: %s', message.id)
+                            this.logDebug('重复消息 id: %s', message.id)
                             reject('重复消息')
                         } else {
                             if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
@@ -261,7 +232,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                     if (en) {
                                         doCreateGroup(en)
                                     } else {
-                                        LogUtils.error('createTgGroup error not found room or contact in pg')
+                                        this.logError('createTgGroup error not found room or contact in pg')
                                     }
                                 })
                             })
@@ -381,7 +352,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         case wxMsgType.Quote:
                             addMessage.wxMsgTypeText = MessageType.Quote;
                             parseQuoteMsg(msg.text()).then(quoteMsg => {
-                                LogUtils.debug('Quote message: %s', msg)
+                                this.logDebug('Quote message: %s', msg)
                                 this.prismaService.prisma.message.findFirst({
                                     where: {wx_msg_id: quoteMsg.parentId}
                                 }).then(parentMsg => {
@@ -471,7 +442,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                         if (!success2) return getFileBox(3);
                                     })
                                     .catch(() => {
-                                        LogUtils.error("No valid file found");
+                                        this.logError("No valid file found");
                                     });
                             }
 
@@ -506,7 +477,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                 addMessage.wxMsgTypeText = MessageType.Video;
                             }
 
-                            LogUtils.debug('Video/File message: %s', msg.text())
+                            this.logDebug('Video/File message: %s', msg.text())
                             // 先发送文字, 自己发的就不转发了
                             if (!msg._self) {
                                 parseAppMsgMessagePayload(msg.text())
@@ -522,7 +493,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             }
                             break;
                         case wxMsgType.Pat:
-                            LogUtils.debug('Pat message: %s', msg.text())
+                            this.logDebug('Pat message: %s', msg.text())
                             break;
                     }
 

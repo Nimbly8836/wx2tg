@@ -9,6 +9,7 @@ export class LogUtils {
     }
 
     public static getLogger(): Logger {
+        LogUtils.config()
         return LogUtils.logger;
     }
 

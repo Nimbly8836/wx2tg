@@ -82,7 +82,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                     this.hasLogin = true
                     this.ready = true
                 }).catch(e => {
-                    LogUtils.error('WxClient get info error : %s', e)
+                    this.logError('WxClient get info error : %s', e)
                 })
                 this.onMessage(null)
                 this.loginTime = new Date().getTime() / 1000

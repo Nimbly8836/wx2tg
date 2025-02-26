@@ -16,6 +16,7 @@ services:
       - ./temp:/root/temp
     restart: unless-stopped
 
+  # 已经有数据库可以删除这个服务
   wx2tg-db:
     image: postgres
     container_name: wx2tg-db

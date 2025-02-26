@@ -28,7 +28,7 @@ model group {
   tg_group_id   BigInt      @unique
   group_name    String?     @db.VarChar(64)
   wx_id         String      @db.VarChar(64)
-  config_id     Int?
+  config_id     Int
   forward       Boolean?    @default(true) @db.Boolean
   // 允许转发的entity id
   allow_ids     BigInt[]
@@ -41,7 +41,7 @@ model group {
   wx_room_id    Int?
   wx_contact    wx_contact? @relation(fields: [wx_contact_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   wx_room       wx_room?    @relation(fields: [wx_room_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  config        config?     @relation(fields: [config_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  config        config      @relation(fields: [config_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([config_id, wx_id], map: "group_config_id_wx_id_uindex")
 }

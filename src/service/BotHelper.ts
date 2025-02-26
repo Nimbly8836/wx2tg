@@ -14,7 +14,7 @@ import {message} from "telegraf/filters";
 import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
-import {updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
+import {createChannel, updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {WxFileClient} from "../client/WxFileClient";
 import {forward} from "../util/GewePostUtils";
@@ -56,7 +56,7 @@ export default class BotHelper extends Singleton<BotHelper> {
             {command: 'sw', description: '切换当前群组转发状态'},
             {
                 command: 'ala',
-                description: '功能暂时未实现！，添加允许转发的id，在当前群组中能转发消息的id。说明请看帮助文档'
+                description: '添加允许转发的id，在当前群组中能转发消息的id。说明请看帮助文档'
             },
             {command: 'al', description: '列出当前允许转发的实体，点击删除'},
 
@@ -322,7 +322,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             this.wxClient.logout().then(r => {
                 ctx.reply('微信登出成功')
             }).catch(e => {
-                LogUtils.error('command logout', e)
+                this.logError('command logout', e)
                 ctx.reply('微信登出失败')
             })
         })
@@ -442,7 +442,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     },
                 });
             }).catch((err) => {
-                LogUtils.error("Failed to get config by token", err);
+                this.logError("Failed to get config by token", err);
             });
         });
 
@@ -492,11 +492,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         .then(data => {
                             resolve({data, total})
                         }).catch(e => {
-                        LogUtils.error('fetchUserData', e)
+                        this.logError('fetchUserData', e)
                         resolve({data: [], total: 0})
                     })
                 }).catch(e => {
-                    LogUtils.error('fetchUserData', e)
+                    this.logError('fetchUserData', e)
                     resolve({data: [], total: 0})
                 })
             })
@@ -515,7 +515,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             }
         }
 
-        registerPagination('USER', fetchUserData, renderUserButton)
+        registerPagination('USER', fetchUserData, renderUserButton, true)
 
         bot.command('user', async (ctx) => {
             const queryUser = ctx.args?.[0] || ''
@@ -529,10 +529,104 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         })
 
         bot.action(/^clickUser:(.*)$/, async (ctx) => {
+            // bot 里面根据是否存在创建群组
             const userName = ctx.match[1]
-            ctx.reply(`你点击了用户 wx_id = ${userName}`)
-            // ctx.
-            ctx.answerCbQuery()
+            this.prismaService.getConfigByToken().then(config => {
+                // 在 bot 的聊天内去创建群组
+                if (ctx.chat.id == Number(config.bot_chat_id)) {
+                    this.prismaService.prisma.group.findFirst({
+                        where: {
+                            config_id: config.id,
+                            wx_id: userName
+                        }
+                    }).then(group => {
+                        if (group) {
+                            return ctx.answerCbQuery('已存在该群组')
+                        } else {
+                            this.prismaService.prisma.wx_contact.findUniqueOrThrow({
+                                where: {
+                                    wx_id_userName: {
+                                        wx_id: config.login_wxid,
+                                        userName: userName
+                                    }
+                                }
+                            }).then(user => {
+                                const title = user.remark ?? user.nickName ?? `用户${user.userName}`
+                                const createGroupParams = {
+                                    isRoom: false,
+                                    loginWxId: config.login_wxid,
+                                    roomId: '',
+                                    fromId: userName,
+                                    configId: config.id,
+                                    channelId: 0,
+                                    title: title,
+                                }
+                                createChannel(
+                                    createGroupParams,
+                                    [Number(config.bot_chat_id), Number(config.bot_id)],
+                                    () => {
+                                        ctx.answerCbQuery('创建成功')
+                                    })
+                            }).catch((reason) => {
+                                this.logDebug('clickUser 不存在', reason)
+                                ctx.answerCbQuery('用户不存在')
+                            })
+                        }
+                    })
+                } else {
+                    // 更新绑定
+                    this.prismaService.getConfigByToken().then(config => {
+                        // 查询用户表
+                        this.prismaService.prisma.wx_contact.findUniqueOrThrow({
+                            where: {
+                                wx_id_userName: {
+                                    wx_id: config.login_wxid,
+                                    userName: userName
+                                }
+                            }
+                        }).then(user => {
+                            const groupName = user.remark ?? user.nickName ?? `用户-${user.userName}`;
+                            this.prismaService.prisma.group.upsert({
+                                create: {
+                                    tg_group_id: ctx.chat.id,
+                                    wx_id: userName,
+                                    is_wx_room: false,
+                                    wx_contact_id: user.id,
+                                    group_name: groupName,
+                                    config_id: config.id,
+                                    headImgUrl: user.bigHeadImgUrl,
+                                },
+                                update: {
+                                    tg_group_id: ctx.chat.id,
+                                    wx_id: userName,
+                                    is_wx_room: false,
+                                    wx_contact_id: user.id,
+                                    group_name: groupName,
+                                    headImgUrl: user.bigHeadImgUrl,
+                                },
+                                where: {
+                                    tg_group_id: ctx.chat.id
+                                }
+                            }).then(() => {
+                                // 更新那个群的名称和头像
+                                updateGroupTitle(groupName, ctx.chat.id)
+                                updateGroupHeadImg(user.bigHeadImgUrl, ctx.chat.id)
+                                ctx.answerCbQuery('绑定成功')
+                            }).catch((reason) => {
+                                // 已经绑定了其他的群组
+                                this.logInfo('clickUser 已经绑定了其他群组', reason)
+                                ctx.answerCbQuery('该用户已经绑定了其他群组')
+                            })
+                        }).catch((reason) => {
+                            this.logInfo('clickUser 不存在', reason)
+                            ctx.answerCbQuery('用户不存在')
+                        })
+
+
+                    })
+                }
+            })
+            // ctx.answerCbQuery()
         })
     }
 
@@ -551,11 +645,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     this.prismaService.pageWxRoom(keyword, take, skip).then(data => {
                         resolve({data, total})
                     }).catch(e => {
-                        LogUtils.error('fetchRoomData', e)
+                        this.logError('fetchRoomData', e)
                         resolve({data: [], total: 0})
                     })
                 }).catch(e => {
-                    LogUtils.error('fetchRoomData', e)
+                    this.logError('fetchRoomData', e)
                     resolve({data: [], total: 0})
                 })
             })
@@ -574,7 +668,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             }
         }
 
-        registerPagination('ROOM', fetchRoomData, renderRoomButton)
+        registerPagination('ROOM', fetchRoomData, renderRoomButton, true)
 
         bot.command('room', async (ctx) => {
             const queryUser = ctx.args?.[0] || ''
@@ -589,8 +683,101 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.action(/^clickRoom:(.*)$/, async (ctx) => {
             const chatroomId = ctx.match[1]
-            ctx.reply(`你点击了chatroomId = ${chatroomId}`)
-            ctx.answerCbQuery()
+            this.prismaService.getConfigByToken().then(config => {
+                // 在 bot 的聊天内去创建群组
+                if (ctx.chat.id == Number(config.bot_chat_id)) {
+                    this.prismaService.prisma.group.findFirst({
+                        where: {
+                            config_id: config.id,
+                            wx_id: chatroomId
+                        }
+                    }).then(group => {
+                        if (group) {
+                            return ctx.answerCbQuery('已存在该群组')
+                        } else {
+                            this.prismaService.prisma.wx_room.findUniqueOrThrow({
+                                where: {
+                                    wx_id_chatroomId: {
+                                        wx_id: config.login_wxid,
+                                        chatroomId: chatroomId
+                                    }
+                                }
+                            }).then(room => {
+                                const title = room.remark ?? room.nickName ?? `群组-${room.chatroomId}`
+                                const createGroupParams = {
+                                    isRoom: false,
+                                    loginWxId: config.login_wxid,
+                                    roomId: chatroomId,
+                                    fromId: '',
+                                    configId: config.id,
+                                    channelId: 0,
+                                    title: title,
+                                }
+                                createChannel(
+                                    createGroupParams,
+                                    [Number(config.bot_chat_id), Number(config.bot_id)],
+                                    () => {
+                                        ctx.answerCbQuery('创建成功')
+                                    })
+                            }).catch(() => {
+                                ctx.answerCbQuery('群组不存在')
+                            })
+                        }
+                    })
+                } else {
+                    // 更新绑定
+                    this.prismaService.getConfigByToken().then(config => {
+                        // 查询用户表
+                        this.prismaService.prisma.wx_room.findUniqueOrThrow({
+                            where: {
+                                wx_id_chatroomId: {
+                                    wx_id: config.login_wxid,
+                                    chatroomId: chatroomId
+                                }
+                            }
+                        }).then(room => {
+                            const groupName = room.remark ?? room.nickName ?? `群组-${room.chatroomId}`;
+                            this.prismaService.prisma.group.upsert({
+                                create: {
+                                    tg_group_id: ctx.chat.id,
+                                    wx_id: chatroomId,
+                                    is_wx_room: true,
+                                    wx_room_id: room.id,
+                                    group_name: groupName,
+                                    config_id: config.id,
+                                    headImgUrl: room.smallHeadImgUrl,
+                                },
+                                update: {
+                                    tg_group_id: ctx.chat.id,
+                                    wx_id: chatroomId,
+                                    is_wx_room: true,
+                                    wx_room_id: room.id,
+                                    group_name: groupName,
+                                    config_id: config.id,
+                                    headImgUrl: room.smallHeadImgUrl,
+                                },
+                                where: {
+                                    tg_group_id: ctx.chat.id
+                                }
+                            }).then(() => {
+                                // 更新那个群的名称和头像
+                                updateGroupTitle(groupName, ctx.chat.id)
+                                updateGroupHeadImg(room.chatroomId, ctx.chat.id)
+                                ctx.answerCbQuery('绑定成功')
+                            }).catch((reason) => {
+                                // 已经绑定了其他的群组
+                                this.logInfo('clickRoom 已经绑定了其他群组', reason)
+                                ctx.answerCbQuery('该群组已经绑定了其他群组')
+                            })
+                        }).catch((reason) => {
+                            this.logInfo('clickRoom 不存在', reason)
+                            ctx.answerCbQuery('群组不存在')
+                        })
+
+
+                    })
+                }
+            })
         })
     }
 
@@ -614,11 +801,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     this.prismaService.pageMessageContent(keyword, take, skip, groupId).then(data => {
                         resolve({data, total})
                     }).catch(e => {
-                        LogUtils.error('fetchScData', e)
+                        this.logError('fetchScData', e)
                         resolve({data: [], total: 0})
                     })
                 }).catch(e => {
-                    LogUtils.error('fetchScData', e)
+                    this.logError('fetchScData', e)
                     resolve({data: [], total: 0})
                 })
             })
@@ -637,7 +824,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             }
         }
 
-        registerPagination('SC', fetchScData, renderScButton)
+        registerPagination('SC', fetchScData, renderScButton, true)
 
         bot.command('sc', async (ctx) => {
             let queryWords = ctx.args?.[0];
@@ -744,7 +931,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 msgId: null
             }).then(res => {
-                LogUtils.debug(res)
+                this.logDebug(res)
             })
         })
 
@@ -843,7 +1030,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 msgId: null
             }).then(res => {
-                LogUtils.debug(res)
+                this.logDebug(res)
             })
         })
 
@@ -887,7 +1074,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         forward(msg.wx_msg_text, Constants.FILE_HELPER, msg.wx_msg_type_text)
                             .then(res => {
                                 // 更新 msg 设置转发的id
-                                LogUtils.debug('forward file message', res)
+                                this.logDebug('forward file message', res)
                                 this.prismaService.prisma.message.update({
                                     where: {id: msg.id},
                                     data: {
@@ -899,7 +1086,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 })
                                 ctx.answerCbQuery('正在下载文件，请稍后')
                             }).catch(e => {
-                            LogUtils.error('forward file message', e)
+                            this.logError('forward file message', e)
                             ctx.answerCbQuery('文件转发失败')
                         })
                     })
@@ -966,7 +1153,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 // @ts-ignore
                 this.wxClient.bot.Room.find({id: group.wx_id}).then(findWxRoom => {
                     findWxRoom.sync().then(syncedRoom => {
-                        LogUtils.debug('syncedRoom', syncedRoom)
+                        this.logDebug('syncedRoom', syncedRoom)
                         this.prismaService.syncRoomDb(syncedRoom.chatroomId)
                         // 更新头像
                         if (force || syncedRoom.avatarImg !== group.headImgUrl) {
@@ -992,7 +1179,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         }
                         ctx.reply('同步成功')
                     }).catch(e => {
-                        LogUtils.error('syncRoom', e)
+                        this.logError('syncRoom', e)
                         ctx.reply('同步失败')
                     })
                 })
@@ -1000,7 +1187,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             } else {
                 this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
                     findWxContact.sync().then(syncedContact => {
-                        LogUtils.debug('syncedContact', syncedContact)
+                        this.logDebug('syncedContact', syncedContact)
                         // 更新头像
                         if (force || syncedContact._avatarUrl !== group.headImgUrl) {
                             this.prismaService.prisma.group.update({
@@ -1025,7 +1212,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         }
                         this.prismaService.syncContactDb(syncedContact._wxid)
                     }).catch(e => {
-                        LogUtils.error('syncContact', e)
+                        this.logError('syncContact', e)
                         ctx.reply('同步失败')
                     })
                     ctx.reply('同步成功')
