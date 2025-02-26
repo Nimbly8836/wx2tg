@@ -53,6 +53,10 @@ export class WxClient extends AbstractClient<GeweBot> {
 
             this.loginTime = new Date().getTime() / 1000
 
+            if (this.ready) {
+                return this.bot.login()
+            }
+
             this.bot.start().then(async ({app, router}) => {
                 app.use(router.routes()).use(router.allowedMethods())
 
@@ -75,6 +79,8 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 this.scanPhotoMsgId, null, '微信，登录成功')
                         })
                     }
+                    this.hasLogin = true
+                    this.ready = true
                 }).catch(e => {
                     LogUtils.error('WxClient get info error : %s', e)
                 })
@@ -91,7 +97,12 @@ export class WxClient extends AbstractClient<GeweBot> {
     }
 
     logout(): Promise<boolean> {
-        return this.bot.logout()
+        return new Promise<boolean>((resolve, reject) => {
+            this.bot.logout().then(() => {
+                this.hasLogin = false
+                resolve(true)
+            }).catch(reject)
+        })
     }
 
     sendMessage(msgParams: SendMessage): Promise<Record<string, any>> {
@@ -109,7 +120,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 const send = (to: Contact | Room) => {
                     switch (msgParams.msgType) {
                         case "text":
-                            to.say(msgParams.content).then(resolve)
+                            to.say(msgParams.content).then(resolve).catch(reject)
                             break;
                         case 'video': // 视频使用文件类型
                         case "file":
@@ -118,7 +129,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                             const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
                             const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
                                 msgParams.fileName, forceType)
-                            to.say(fileBox).then(resolve)
+                            to.say(fileBox).then(resolve).catch(reject)
                             break;
                         default:
                             break;
@@ -143,7 +154,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
     }
 
-    check(): Promise<boolean> {
+    check(): Promise<any> {
         return this.bot.checkOnline()
     }
 

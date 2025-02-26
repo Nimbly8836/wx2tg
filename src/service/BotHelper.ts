@@ -8,7 +8,7 @@ import {ConfigEnv} from "../config/Config";
 import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
 import {initPaginationCallback, PagedResult, registerPagination, sendPagedList} from "../util/PageHelper";
-import {wx_contact, wx_room} from "@prisma/client";
+import {tg_entity, wx_contact, wx_room} from "@prisma/client";
 import * as fs from "node:fs";
 import {message} from "telegraf/filters";
 import {LogUtils} from "../util/LogUtils";
@@ -21,6 +21,9 @@ import {forward} from "../util/GewePostUtils";
 import {MsgType} from "../base/IMessage";
 import {DownloadMediaInterface} from "telegram/client/downloads";
 import {TgMessageUtils} from "../util/TgMessageUtils";
+import {Api} from "telegram/tl";
+import {config} from "dotenv";
+import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -47,11 +50,15 @@ export default class BotHelper extends Singleton<BotHelper> {
             {command: 'roomml', description: '查看群组成员信息'},
             {command: 'sync', description: '同步群组/联系人信息'},
             {command: 'info', description: '查看当前群信息'},
-            {command: 'check', description: '检查微信是否在线（不准确）'},
+            {command: 'check', description: '检查微信是否在线'},
             {command: 'sc', description: '搜索聊天记录内容，在群组使用只搜索当前群组'},
             {command: 'fu', description: '强制更新群组信息（名称和头像）'},
             {command: 'sw', description: '切换当前群组转发状态'},
-            {command: 'al', description: '暂时未实现！！添加允许转发的id，在当前群组中能转发消息的id。说明请看帮助文档'}
+            {
+                command: 'ala',
+                description: '功能暂时未实现！，添加允许转发的id，在当前群组中能转发消息的id。说明请看帮助文档'
+            },
+            {command: 'al', description: '列出当前允许转发的实体，点击删除'},
 
         ]
 
@@ -169,7 +176,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         })
 
         bot.command('info', async (ctx) => {
-            this.prismaService.prisma.group.findUnique({
+            this.prismaService.prisma.group.findUniqueOrThrow({
                 where: {
                     tg_group_id: ctx.chat.id
                 },
@@ -194,6 +201,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         })
                     })
                 }
+            }).catch(() => {
+                ctx.reply('当前群组未绑定')
             })
         })
 
@@ -216,12 +225,98 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         forward: !group.forward
                     }
                 }).then(() => {
+                    if (group.forward) {
+                        removeFromGroupIds(Number(group.tg_group_id))
+                    } else {
+                        addToGroupIds(Number(group.tg_group_id))
+                    }
                     ctx.reply('切换成功,当前群组转发状态：' + (!group.forward ? '开启' : '关闭'))
                 })
             }).catch(() => {
                 ctx.reply('当前群组未绑定')
             })
         })
+
+        bot.command('ala', async ctx => {
+            this.prismaService.prisma.group.findUniqueOrThrow({
+                where: {tg_group_id: ctx.chat.id}
+            }).then(async group => {
+                const entityLike = ctx.args;
+                if (entityLike) {
+                    const entities = await Promise.all(entityLike.map(async it => {
+                        let entity: tg_entity;
+                        if (parseInt(it) == 1) {
+                            entity = {
+                                user_id: BigInt(1),
+                                user_name: '所有人',
+                                first_name: null,
+                                last_name: null,
+                            };
+                        } else {
+                            const subFlag = it.startsWith('-');
+                            it = subFlag ? it.slice(1) : it;
+                            if (parseInt(it)) { // 纯id的情况
+                                const entityFromUserId = await this.tgClient.bot.getEntity(it);
+                                if (entityFromUserId instanceof Api.User) {
+                                    entity = {
+                                        user_id: BigInt(entityFromUserId.id.toJSNumber()),
+                                        user_name: entityFromUserId.username,
+                                        first_name: entityFromUserId.firstName,
+                                        last_name: entityFromUserId.lastName,
+                                    };
+                                }
+                            } else {
+                                // @开头的去除at
+                                const entityFromUserId = await this.tgClient.bot.getEntity(it.startsWith('@') ? it.slice(1) : it);
+                                if (entityFromUserId instanceof Api.User) {
+                                    entity = {
+                                        user_id: BigInt(entityFromUserId.id.toJSNumber()),
+                                        user_name: entityFromUserId.username,
+                                        first_name: entityFromUserId.firstName,
+                                        last_name: entityFromUserId.lastName,
+                                    };
+                                }
+                            }
+                            if (subFlag) {
+                                entity.user_id = -entity.user_id;
+                            }
+                        }
+                        return entity;
+                    }));
+
+                    entities.forEach(it => {
+                        this.prismaService.prisma.tg_entity.upsert({
+                            where: {
+                                user_id: Math.abs(Number(it.user_id))
+                            },
+                            update: {
+                                user_name: it.user_name,
+                                first_name: it.first_name,
+                                last_name: it.first_name,
+                            },
+                            create: {
+                                ...it,
+                                user_id: Math.abs(Number(it.user_id)),
+                            }
+                        }).then()
+                    })
+
+                    const allowIds = group.allow_ids;
+                    const set = new Set(allowIds);
+                    entities.forEach(it => set.add(it.user_id))
+                    this.prismaService.prisma.group.update({
+                        where: {id: group.id},
+                        data: {
+                            allow_ids: [...set]
+                        }
+                    }).then(() => {
+                        ctx.reply('添加成功')
+                    })
+
+                }
+            }).catch(() => ctx.reply('当前群组未绑定'))
+        })
+
 
         bot.command('logout', async (ctx) => {
             this.wxClient.logout().then(r => {
@@ -234,7 +329,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.command('check', ctx => {
             this.wxClient.check().then(r => {
-                ctx.reply(r ? '微信在线' : '微信离线')
+                if (r?.data) {
+                    ctx.reply('微信在线')
+                } else {
+                    ctx.reply('微信离线')
+                }
             })
         })
 
@@ -243,6 +342,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         this.room(bot)
         this.sc(bot)
         this.checkRoomMember(bot)
+        this.al(bot)
         // 分页初始化
         initPaginationCallback(bot)
     }
@@ -272,7 +372,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
-                type: 'file'
+                type: 'file',
+                ctx: ctx,
             })
         })
 
@@ -281,7 +382,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
-                type: 'image'
+                type: 'image',
+                ctx: ctx,
             })
         })
 
@@ -290,7 +392,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
-                type: 'file' // 是用文件类型发送
+                type: 'file', // 用文件类型发送
+                ctx: ctx,
             })
         })
 
@@ -299,7 +402,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
-                type: 'file' // 是用文件类型发送
+                type: 'file', // 用文件类型发送
+                ctx: ctx,
             })
         })
 
@@ -653,6 +757,117 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         })
     }
 
+    /**
+     * 列出当前群组内的转发的实体
+     * */
+    private al(bot: Telegraf) {
+        let currentUserList: tg_entity[] = []
+        let chatId: number
+        const fetchScData = async (
+            pageNo: number,
+            pageSize: number,
+            queryParams: Record<string, any>
+        ): Promise<PagedResult<any>> => {
+            const skip = (pageNo - 1) * pageSize
+            const endIndex = pageSize * pageNo
+            const keyword = queryParams?.keyword
+            chatId = queryParams?.chatId ? queryParams?.chatId : chatId
+
+
+            return new Promise<PagedResult<any>>(resolve => {
+                if (chatId) {
+                    this.prismaService.prisma.group.findUniqueOrThrow({
+                        where: {tg_group_id: chatId}
+                    }).then(g => {
+                        // 都是正的
+                        const allowIds: bigint[] = []
+                        for (let allowId of g.allow_ids) {
+                            allowIds.push(BigInt(Math.abs(Number(allowId))))
+                        }
+                        this.prismaService.prisma.tg_entity.findMany({
+                            where: {
+                                user_id: {
+                                    in: allowIds
+                                },
+                                OR: [
+                                    {user_name: {contains: keyword}},
+                                    {first_name: {contains: keyword}},
+                                    {last_name: {contains: keyword}}
+                                ]
+                            }, orderBy: {user_id: 'asc'}
+                        }).then(users => {
+                            users.forEach(it => {
+                                // 这里是存的 -id 的情况
+                                if (!g.allow_ids.includes(it.user_id)) {
+                                    it.user_id = -it.user_id
+                                }
+                            })
+                            const data = users.slice(skip, endIndex)
+                            currentUserList = data
+                            resolve({data, total: currentUserList.length})
+                        })
+                    })
+                } else {
+                    resolve({data: [], total: 0})
+                }
+            })
+
+        }
+
+        const renderScButton = (
+            item: any,
+            index: number,
+            pageNo: number,
+            pageSize: number
+        ) => {
+            let text = item.user_name ?? item.first_name ?? item.last_name ?? item.user_id
+            if (item.user_id < 0) {
+                text = '不能转发：' + text
+            }
+            return {
+                text: text,
+                callbackData: `clickAl:${item.user_id}`,
+            }
+        }
+
+        registerPagination('AL', fetchScData, renderScButton, true)
+
+        bot.command('al', async (ctx) => {
+            const queryUser = ctx.args?.[0] || ''
+            sendPagedList(ctx, 'AL', {
+                pageNo: 1,
+                pageSize: 10,
+                columns: 1
+            }, {
+                keyword: queryUser,
+                chatId: ctx.chat.id,
+                msgId: null
+            }).then(res => {
+                LogUtils.debug(res)
+            })
+        })
+
+        bot.action(/^clickAl:(.*)$/, async (ctx) => {
+            const userId = ctx.match[1]
+            this.prismaService.prisma.group.findUniqueOrThrow({
+                where: {tg_group_id: chatId}
+            }).then(g => {
+                g.allow_ids = g.allow_ids.filter(it => it !== BigInt(userId))
+                this.prismaService.prisma.group.update({
+                    where: {id: g.id},
+                    data: {
+                        allow_ids: g.allow_ids
+                    }
+                }).then(() => {
+                    // TODO：删除后刷新
+                    ctx.answerCbQuery('删除成功')
+                })
+            }).catch(e => {
+                ctx.answerCbQuery('删除失败，群组没绑定')
+            })
+        })
+    }
+
     public onAction(bot: Telegraf) {
         bot.action(/^download:(.*)$/, async ctx => {
             // 检查是否有登陆微信文件助手
@@ -698,13 +913,14 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         text: string,
         message_id: number,
         type?: string,
+        ctx: any,
     }) {
         const {chatId, text, message_id, type} = sendParams
         // 是自己发送的不处理
         if (TgMessageUtils.popMessage(chatId, message_id)) {
             return
         }
-        const group = await this.prismaService.prisma.group.findUnique({
+        const group = await this.prismaService.prisma.group.findUniqueOrThrow({
             where: {tg_group_id: chatId}
         })
         if (!group.forward) {
@@ -732,8 +948,12 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 file: file,
                                 fileName: msg.file.name
                                     ?? `${chatId}-${msg.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`,
-                            }).then()
-                        })
+                            }).then().catch(e => {
+                                sendParams.ctx?.reply('文件发送失败')
+                            })
+                        }).catch(e => {
+                        sendParams.ctx?.reply('文件下载失败')
+                    })
                 })
             })
     }

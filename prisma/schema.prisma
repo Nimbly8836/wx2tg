@@ -14,6 +14,7 @@ model config {
   bot_chat_id BigInt
   bot_id      BigInt       @default(0)
   bot_token   String       @db.VarChar
+  // 登陆人的wxId
   login_wxid  String       @unique @db.VarChar
   setting     Json?        @db.Json
   tg_login    Boolean?     @default(false) @db.Boolean
@@ -29,6 +30,7 @@ model group {
   wx_id         String      @db.VarChar(64)
   config_id     Int?
   forward       Boolean?    @default(true) @db.Boolean
+  // 允许转发的entity id
   allow_ids     BigInt[]
   is_wx_room    Boolean?    @default(false) @db.Boolean
   create_at     DateTime?   @default(now()) @db.Timestamptz(6)
@@ -46,20 +48,29 @@ model group {
 
 model message {
   id               BigInt    @id @default(autoincrement())
+  // group 表 id
   group_id         Int?
   from_wx_id       String?   @db.VarChar(64)
   content          String?   @db.VarChar
   is_deleted       Int?      @default(0) @db.SmallInt
   parent_id        BigInt?
+  // 微信消息id
   wx_msg_id        String?   @db.VarChar
+  // 转发到微信文件助手的id
   wx_hp_msg_id     String?   @db.VarChar
   // msg.text() 获取的原始消息内容，需要的时候存储
   wx_msg_text      String?   @db.VarChar
+  // 微信消息类型 int
   wx_msg_type      Int?
+  // 微信消息类型 string
   wx_msg_type_text String?   @db.VarChar
+  // 发送微信消息人的展示名称
   wx_msg_user_name String?   @db.VarChar
+  // 存储文件的名称
   file_name        String?   @db.VarChar
+  // 存储文件的路径
   file_path        String?   @db.VarChar
+  // tg 群组内消息id
   tg_msg_id        BigInt?
   create_at        DateTime? @default(now()) @db.Timestamptz(6)
   modify_at        DateTime? @default(now()) @db.Timestamptz(6)
@@ -114,4 +125,12 @@ model wx_room {
   group           group[]
 
   @@unique([wx_id, chatroomId], map: "wx_room_wx_id_room_id_uindex")
+}
+
+// 允许转发的实体类
+model tg_entity {
+  user_id    BigInt  @id
+  user_name  String? @db.VarChar
+  first_name String? @db.VarChar
+  last_name  String? @db.VarChar
 }

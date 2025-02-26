@@ -28,7 +28,7 @@ export async function xmlToJson(xml: string): Promise<any> {
 export async function parseAppMsgMessagePayload(messageContent: string): Promise<AppMessagePayload> {
     return new Promise((resolve, reject) => {
         xmlToJson(messageContent).then((appMsgXml: AppMsgXmlSchema) => {
-            const {title, des, url, thumburl, type, md5, recorditem, mmreader} = appMsgXml.msg?.appmsg
+            const {title, des, url, thumburl, type, md5, recorditem, mmreader} = appMsgXml.msg?.appmsg ?? {}
 
             let appattach: AppAttachPayload | undefined
             let channel: ChannelsMsgPayload | undefined
@@ -94,6 +94,7 @@ export async function parseAppMsgMessagePayload(messageContent: string): Promise
                 items: mmreader?.category?.item,
                 wcpayinfo,
                 videomsg: appMsgXml.msg.videomsg,
+                emoji: appMsgXml?.msg?.emoji?.$,
             })
         })
     })

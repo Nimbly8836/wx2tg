@@ -114,12 +114,20 @@ export class MessageService extends Singleton<MessageService> {
                             });
                         }
                     }
+
+                    // 消息过多的时候
+                    if (e.response?.error_code === 429 && e.response?.description.includes('Too Many Requests')) {
+                        const time = e.response?.parameters?.retry_after * 1000 || 20000
+                        setTimeout(() => {
+                            this.messageQueue.unshift(sendMessage)
+                        }, time)
+                    }
                 }).finally(() => {
                     // Stop retrying if max retries reached
                     if (retryCount >= this.maxRetries) {
-                        LogUtils.error(`Max retries reached for message: ${sendMessage.content}`);
-                        sendMessage.isSending = false;
-                        sendMessage.success = false; // Mark as failed
+                        LogUtils.error(`Max retries reached for message: ${sendMessage.content}`)
+                        sendMessage.isSending = false
+                        sendMessage.success = false // Mark as failed
                     }
                 });
             }

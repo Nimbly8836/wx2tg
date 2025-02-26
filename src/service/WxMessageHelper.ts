@@ -3,7 +3,7 @@ import {Contact, Filebox, Message} from "gewechaty";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {Api} from "telegram";
-import type {group, config} from '@prisma/client'
+import type {config, group} from '@prisma/client'
 import {WxClient} from "../client/WxClient";
 import {ClientEnum} from "../constant/ClientConstants";
 import {MessageService} from "./MessageService";
@@ -11,15 +11,14 @@ import {LogUtils} from "../util/LogUtils";
 import {parseAppMsgMessagePayload, parseQuoteMsg} from "../util/MessageUtils";
 import {SendMessage} from "../base/IMessage";
 import FileUtils from "../util/FileUtils";
-import {JsonObject} from "@prisma/client/runtime/client";
 import {SettingType} from "../util/SettingUtils";
 import {CustomFile} from "telegram/client/uploads";
-import {addToFolder, createGroupWithHeadImg} from "./UserClientHelper";
+import {createGroupWithHeadImg} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
-import InputMediaPhoto = Api.InputMediaPhoto;
 import {MessageType} from "../entity/Message";
+import {addToGroupIds} from "../util/CacheUtils";
 // import {Settings} from "../util/SettingUtils";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
@@ -113,6 +112,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                 })?.id
 
                                 if (channelId) {
+                                    // 添加监听群组
+                                    addToGroupIds(channelId.toJSNumber())
                                     this.tgUserClient.bot.invoke(
                                         new Api.channels.TogglePreHistoryHidden({
                                             channel: channelId,
@@ -138,7 +139,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                     }).then(async (message) => {
                         if (message) {
                             LogUtils.debug('重复消息 id: %s', message.id)
-                            resolve(existGroup)
+                            reject('重复消息')
                         } else {
                             if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
                                 await this.prismaService.createOrUpdateWxConcatAndRoom()
@@ -302,8 +303,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                     }
                     const chatId = Number(res.tg_group_id);
                     let content = msg.text()
-                    let title
-                    let wx_msg_user_name
+                    let title = ''
+                    let wx_msg_user_name = ''
                     if (msg._self) {
                         title = '你:'
                         wx_msg_user_name = '你'
@@ -432,6 +433,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                                 null, {
                                                     type: 'photo',
                                                     media: {source: fileBuffer},
+                                                    caption: `${wx_msg_user_name}`,
                                                 })
                                         })
                                     }
@@ -476,14 +478,26 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             processFileBox(msg)
                             break;
                         case wxMsgType.Voice:
+                            addMessage.content = msg._self ? '发送[语音]' : '收到[语音]'
+                            this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             break;
                         case wxMsgType.Emoji:
+                            addMessage.msgType = 'emoji'
 
-                            LogUtils.debug('Emoji message: %s', msg.text())
-                            // msg.toFileBox().then(fileBox => {
-                            //     LogUtils.debug('Voice/Emoji message: %s', fileBox?.name)
-                            //     fileBox.toFile(`storage/downloads/${fileBox?.name}`)
-                            // })
+                            parseAppMsgMessagePayload(msg.text()).then(appMsg => {
+                                if (appMsg?.emoji) {
+                                    FileUtils.downloadBuffer(appMsg?.emoji.cdnurl)
+                                        .then(file => {
+                                            addMessage.file = file
+                                            addMessage.content = '[表情]'
+                                            addMessage.wxMsgTypeText = MessageType.Emoji;
+                                            addMessage.ext.wxMsgText = msg.text()
+                                            addMessage.ext.width = appMsg.emoji.width
+                                            addMessage.ext.height = appMsg.emoji.height
+                                            this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
+                                        })
+                                }
+                            })
                             break;
                         case wxMsgType.Video:
                         case wxMsgType.File:

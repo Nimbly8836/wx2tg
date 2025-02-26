@@ -10,11 +10,15 @@ import PrismaService from "../service/PrismaService";
 import {Telegraf} from "telegraf";
 import {message} from "telegraf/filters";
 import {Api} from "telegram";
+import {NewMessage} from "telegram/events";
+import {groupIds, initGroupIds} from "../util/CacheUtils";
+import {MessageService} from "../service/MessageService";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
     public static DEFAULT_FILTER_ID: number = 116
     public static DIALOG_TITLE: string = 'WeChat'
+    private readonly prismaService = PrismaService.getInstance(PrismaService)
 
     private constructor() {
         super();
@@ -49,6 +53,9 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             this.setupFolder()
         }
 
+        // 设置需要监听的群组id
+        initGroupIds()
+
     }
 
     async login(): Promise<boolean> {
@@ -64,6 +71,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                         data: {tg_login: true}
                     }).then()
                     this.hasLogin = true
+                    this.setEvenHandler()
                     resolve(true)
                     return
                 }
@@ -113,6 +121,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                         this.hasLogin = true
                         resolve(true)
                     })
+                    this.setEvenHandler()
                 })
             })
         })
@@ -177,6 +186,74 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                 })
             }
         })
+    }
+
+    private setEvenHandler() {
+        const messageService = MessageService.getInstance(MessageService);
+
+        if (this.bot.connected) {
+            // 监听所有接收的消息
+            this.bot.addEventHandler(event => {
+                if (groupIds.has(event.chatId.toJSNumber())) {
+                    this.prismaService.prisma.group.findUnique({
+                        where: {tg_group_id: event.chatId.toJSNumber()}
+                    }).then(async group => {
+                        // 判断是否允许转发
+                        const allowIds = group.allow_ids;
+                        // 转发所有人的，除了 id 是负的
+                        let forward = true
+                        // 自己部署的机器人的消息不转发
+                        const config = await this.prismaService.getConfigByToken()
+                        if (event.message.fromId instanceof Api.PeerUser) {
+                            if (Number(config.bot_id) == event.message.fromId.userId.toJSNumber()) {
+                                forward = false
+                            }
+                        }
+                        if (allowIds.includes(BigInt(1))) {
+                            if (event.message.fromId instanceof Api.PeerUser) {
+                                const disableIdWhenAll = -(event.message.fromId.userId.toJSNumber())
+                                if (allowIds.includes(BigInt(disableIdWhenAll))) {
+                                    forward = false
+                                }
+                            }
+
+                        } else { // 只转发指定的
+                            if (event.message.fromId instanceof Api.PeerUser) {
+                                const checkId = event.message.fromId.userId.toJSNumber()
+                                if (!allowIds.includes(BigInt(checkId))) {
+                                    forward = false
+                                }
+                            }
+                        }
+                        // 处理转发的消息
+                        if (forward) {
+                            messageService.addMessages({
+                                msgType: 'text',
+                                chatId: event.chatId.toJSNumber(),
+                                content: event.message.text,
+                            }, ClientEnum.WX_BOT)
+
+                            if (event.message.media) {
+                                event.message.downloadMedia().then(async media => {
+                                    const mimeTypeSplit = event.message.file.mimeType?.split('/');
+                                    const notNamedFile = `${event.chatId}-${event.message.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`
+                                    messageService.addMessages({
+                                        content: "",
+                                        msgType: 'file',
+                                        chatId: event.chatId.toJSNumber(),
+                                        file: media,
+                                        fileName: event.message.file.name || notNamedFile,
+                                    }, ClientEnum.WX_BOT)
+                                })
+                            }
+                        }
+                    })
+
+                }
+            }, new NewMessage({
+                incoming: true,
+            }))
+        }
     }
 
 }

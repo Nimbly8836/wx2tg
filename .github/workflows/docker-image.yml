@@ -11,14 +11,12 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        platform: [ linux/amd64, linux/arm64/v8, linux/arm/v7 ]
+        platform: [ linux/amd64, linux/arm64/v8 ]
         include:
           - platform: linux/amd64
             QEMU_ARCH: x86_64
           - platform: linux/arm64/v8
             QEMU_ARCH: aarch64
-          - platform: linux/arm/v7
-            QEMU_ARCH: arm
 
     steps:
       - name: Prepare
@@ -48,7 +46,7 @@ jobs:
 
       - name: Cache Node.js modules
         id: cache-node-modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-${{ matrix.platform }}-node-modules-${{ hashFiles('**/package-lock.json') }}

@@ -149,6 +149,16 @@ export default class BotClient extends AbstractClient<Telegraf> {
                         })
                     }
                     break;
+                case "emoji":
+                    result = telegram.sendAnimation(msg.chatId,
+                        // 直接使用 gif 后缀
+                        {source: msg.file as Buffer, filename: 'emoji.gif'},
+                        {
+                            caption: `${msg.title}`,
+                            width: Number(msg.ext.width) || 125,
+                            height: Number(msg.ext.height) || 125,
+                        })
+                    break;
                 default:
                     break;
             }

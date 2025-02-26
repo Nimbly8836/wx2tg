@@ -98,8 +98,45 @@ export interface AppMsgXmlSchema {
             appname: any;
         };
         videomsg: VideoMsgPayload,
+        emoji: {
+            $: EmojiMsgPayload,
+        },
     };
 }
+
+export interface EmojiMsgPayload {
+    fromusername?: string; // 发送者用户名
+    tousername?: string; // 接收者用户名
+    type?: string; // 消息类型
+    idbuffer?: string; // 媒体ID
+    md5?: string; // MD5值
+    len?: string; // 文件长度
+    productid?: string; // 产品ID
+    androidmd5?: string; // 安卓MD5值
+    androidlen?: string; // 安卓文件长度
+    s60v3md5?: string; // S60v3 MD5值
+    s60v3len?: string; // S60v3文件长度
+    s60v5md5?: string; // S60v5 MD5值
+    s60v5len?: string; // S60v5文件长度
+    cdnurl?: string; // CDN下载URL
+    designerid?: string; // 设计师ID
+    thumburl?: string; // 缩略图URL
+    encrypturl?: string; // 加密URL
+    aeskey?: string; // AES密钥
+    externurl?: string; // 外部URL
+    externmd5?: string; // 外部URL的MD5值
+    width?: string; // 图片宽度
+    height?: string; // 图片高度
+    tpurl?: string; // TP下载URL
+    tpauthkey?: string; // TP授权密钥
+    attachedtext?: string; // 附加文本
+    attachedtextcolor?: string; // 附加文本颜色
+    lensid?: string; // 镜头ID
+    emojiattr?: string; // 表情属性
+    linkid?: string; // 链接ID
+    desc?: string; // 描述
+}
+
 
 export interface WCPayInfo {
     templateid?: string; // 模板ID
@@ -225,6 +262,7 @@ export interface AppMessagePayload {
     items?: appMsgXmlSchema_mmreader_item [];
     wcpayinfo?: WCPayInfo;
     videomsg?: VideoMsgPayload;
+    emoji?: EmojiMsgPayload;
 }
 
 export interface appMsgXmlSchema_mmreader_item {
