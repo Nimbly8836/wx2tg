@@ -56,7 +56,9 @@ docker compose up -d
 
 docker-compose up -d
 
-podman-compose -f compose.yaml up -d
+podman compose up -d
+
+podman-compose up -d
 ```
 
 ## 使用

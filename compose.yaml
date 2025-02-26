@@ -1,6 +1,6 @@
 services:
   wx2tg:
-    image: localhost/wx2tg:latest
+    image: docker.io/xleat/wx2tg:latest
     container_name: wx2tg
     env_file:
       - .env
@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
 
   gewe:
-    image: xleat/gewe:alpine
+    image: docker.io/xleat/gewe:alpine
     container_name: gewe
     volumes: # 示例，换成你的 volumes
       - ./temp:/root/temp
@@ -18,7 +18,7 @@ services:
 
   # 已经有数据库可以删除这个服务
   wx2tg-db:
-    image: postgres
+    image: docker.io/postgres
     container_name: wx2tg-db
     restart: unless-stopped
     volumes: # 示例，换成你的 volumes
