@@ -65,7 +65,7 @@ jobs:
           tags: |
             xleat/wx2tg:latest
             xleat/wx2tg:${{ env.APP_VERSION }}
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64/v8  # Specify multiple platforms for the build
           cache-from: type=gha  # Use GitHub Actions cache
           cache-to: type=gha,mode=max  # Store cache for future runs
 
