@@ -27,6 +27,7 @@ services:
     volumes: # 示例，换成你的 volumes
       - ./data/db:/var/lib/postgresql/data
     environment:
+      POSTGRES_DB: wx2tg
       POSTGRES_PASSWORD: example # 记得修改 POSTGRES 的密码
       PGDATA: /var/lib/postgresql/data/pgdata
 
