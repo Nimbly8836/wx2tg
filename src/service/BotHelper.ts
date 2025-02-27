@@ -348,16 +348,21 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     }
 
     public onMessage(bot: Telegraf) {
-        bot.on(message('text'), async ctx => {
+        bot.on(message('text'), async (ctx, next) => {
             const text = ctx.message.text;
+            // 这是等待 TG 登陆输入的消息 直接跳过
+            if (this.tgClient.waitingReplyOnLogin.includes(ctx.message.message_id)) {
+                return next();
+            }
+            // 命令跳过
             if (text.startsWith('/')) {
-                return;
+                return next()
             }
             const group = await this.prismaService.prisma.group.findUnique({
                 where: {tg_group_id: ctx.chat.id}
             })
             if (!group?.forward) {
-                return
+                return next()
             }
             this.messageService.addMessages({
                 msgType: 'text',
@@ -1105,6 +1110,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         const {chatId, text, message_id, type} = sendParams
         // 是自己发送的不处理
         if (TgMessageUtils.popMessage(chatId, message_id)) {
+            this.logDebug('自己发送的文件，不处理')
             return
         }
         const group = await this.prismaService.prisma.group.findUniqueOrThrow({

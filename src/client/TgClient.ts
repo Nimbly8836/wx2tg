@@ -13,12 +13,15 @@ import {Api} from "telegram";
 import {NewMessage} from "telegram/events";
 import {groupIds, initGroupIds} from "../util/CacheUtils";
 import {MessageService} from "../service/MessageService";
+import QRCode from "qrcode";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
     public static DEFAULT_FILTER_ID: number = 116
     public static DIALOG_TITLE: string = 'WeChat'
     private readonly prismaService = PrismaService.getInstance(PrismaService)
+    public waitingReplyOnLogin = []
+
 
     private constructor() {
         super();
@@ -75,42 +78,56 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                     resolve(true)
                     return
                 }
-                const rmMsgId = []
                 const waitInput = (textMsg: string) => {
                     return new Promise<string>(resolve => {
                         tgBot.telegram.sendMessage(Number(config.bot_chat_id),
                             `${textMsg}`)
                             .then(res => {
-                                rmMsgId.push(res.message_id)
-                                tgBot.on(message('reply_to_message'), (ctx) => {
-                                    const password = ctx.text.trim();
-                                    rmMsgId.push(ctx.message.message_id)
-                                    resolve(password)
+                                this.waitingReplyOnLogin.push(res.message_id)
+                                tgBot.on(message('reply_to_message'), (ctx, next) => {
+                                    this.logDebug('login on reply_to_message', ctx)
+                                    const input = ctx.text.trim();
+                                    this.waitingReplyOnLogin.push(ctx.message.message_id)
+                                    resolve(input)
+                                    return next()
                                 })
                             })
                     })
                 }
                 const config = await prisma.getConfigByToken()
-                this.bot.start({
+                const chatId = Number(config.bot_chat_id);
+                this.bot.signInUserWithQrCode({
+                    apiId: ConfigEnv.API_ID,
+                    apiHash: ConfigEnv.API_HASH,
+                }, {
                     onError: (e) => {
                         if (e) {
-                            tgBot.telegram.sendMessage(Number(config.bot_chat_id), `登录失败：${e}`)
+                            tgBot.telegram.sendMessage(chatId, `登录失败：${e}`).then(res => {
+                                this.waitingReplyOnLogin.push(res.message_id)
+                            })
                         }
                     },
-                    phoneNumber: async () => {
-                        return waitInput('请回复这条消息，输入你的手机号码，例如：+8612345678901')
+                    qrCode: async (code) => {
+                        const qrcode = `tg://login?token=${code.token.toString("base64url")}`
+                        QRCode.toBuffer(qrcode, {
+                            width: 150
+                        }, (error, buffer) => {
+                            if (!error) {
+                                tgBot.telegram.sendPhoto(chatId, {source: buffer}, {
+                                    caption: '请使用手机 TG 扫码登录'
+                                }).then(res => {
+                                    this.waitingReplyOnLogin.push(res.message_id)
+                                })
+                            }
+                        })
                     },
-                    password: async (hint) => {
+                    password: (hint) => {
                         return waitInput(`请回复这条消息，输入二步验证码，密码提示：${hint}`)
-                    },
-                    phoneCode: async () => {
-                        return waitInput('请回复这条消息，输入短信验证码')
-                    },
-
+                    }
                 }).then(() => {
                     // 删除消息
                     tgBot.telegram.deleteMessages(Number(config.bot_chat_id),
-                        rmMsgId)
+                        this.waitingReplyOnLogin)
                     tgBot.telegram.sendMessage(Number(config.bot_chat_id),
                         'TG 登录成功',
                     ).then(() => {

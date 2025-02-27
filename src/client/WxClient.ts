@@ -144,6 +144,8 @@ export class WxClient extends AbstractClient<GeweBot> {
                 } else if (group.wx_contact?.userName) {
                     this.bot.Contact.find({id: group.wx_contact?.userName}).then(contact => {
                         send(contact)
+                    }).catch((e) => {
+                        this.logError('find contact error : %s', e)
                     })
                 }
 
