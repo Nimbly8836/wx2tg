@@ -2,6 +2,9 @@ services:
   wx2tg:
     image: docker.io/xleat/wx2tg:latest
     container_name: wx2tg
+    depends_on:
+      - wx2tg-db
+      - gewe
     env_file:
       - .env
     volumes: # 示例，换成你的 volumes

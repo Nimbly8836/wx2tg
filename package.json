@@ -1,13 +1,13 @@
 {
   "name": "wx2tg",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "simple kit send wechat message to telegram",
   "main": "app.ts",
   "esModuleInterop": true,
   "scripts": {
     "dev": "ts-node src/app.ts",
     "build": "tsc",
-    "start": "npm run init-db && tsc && LOG_LEVEL=pro node dist/app.js",
+    "start": "prisma db push --accept-data-loss --skip-generate && LOG_LEVEL=pro node dist/app.js",
     "init-db": "prisma migrate dev --name init"
   },
   "keywords": [
