@@ -51,13 +51,13 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
                 const prismaService = PrismaService.getInstance(PrismaService);
                 prismaService.getConfigByToken().then(config => {
-                    if (!config.tg_login) {
+                    if (!config?.tg_login) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请先输入 /start，然后按照提示登录 Telegram`)
                     }
-                    if (!config.login_wxid) {
+                    if (!config?.login_wxid) {
                         this.bot.telegram.sendMessage(Number(config.bot_chat_id), `请使用命令 /login 登录微信`)
                     }
-                    if (!config.setting) {
+                    if (!config?.setting) {
                         prismaService.config().update({
                             where: {id: config.id},
                             data: {
