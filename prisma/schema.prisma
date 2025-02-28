@@ -13,7 +13,7 @@ model config {
   id          Int          @id @default(autoincrement())
   bot_chat_id BigInt
   bot_id      BigInt       @default(0)
-  bot_token   String       @db.VarChar
+  bot_token   String       @db.VarChar @unique
   // 登陆人的wxId
   login_wxid  String       @unique @db.VarChar
   setting     Json?        @db.Json

@@ -65,13 +65,14 @@ export class WxClient extends AbstractClient<GeweBot> {
                 const config = prismaService.config()
                 this.bot.info().then(async info => {
                     const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
-                    const botId = Number(botClient.bot.botInfo.id)
-                    config.updateMany({
-                        where: {bot_token: ConfigEnv.BOT_TOKEN},
-                        data: {login_wxid: info.wxid, bot_id: botId}
-                    }).then(() => {
-                        prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
-                    })
+                    if (info?.wxid) {
+                        config.update({
+                            where: {bot_token: ConfigEnv.BOT_TOKEN},
+                            data: {login_wxid: info.wxid}
+                        }).then(() => {
+                            prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                        })
+                    }
                     if (this.scanPhotoMsgId) {
                         prismaService.getConfigByToken().then(findConfig => {
                             const chatId = findConfig.bot_chat_id
@@ -178,7 +179,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                     const tgBot = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
                     if (!error) {
                         PrismaService.getInstance(PrismaService).config()
-                            .findFirst({where: {bot_token: ConfigEnv.BOT_TOKEN}})
+                            .findUnique({where: {bot_token: ConfigEnv.BOT_TOKEN}})
                             .then(findConfig => {
                                 const chatId = findConfig.bot_chat_id
                                 tgBot.bot.telegram.sendPhoto(Number(chatId), {source: buffer},

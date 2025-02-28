@@ -119,8 +119,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         })
 
         bot.command('start', (ctx) => {
+            if (ConfigEnv.OWNER_ID !== ctx.chat.id) {
+                return
+            }
             const config = this.prismaService.config()
-            config.findFirst({where: {bot_chat_id: ctx.chat.id}})
+            config.findUnique({where: {bot_token: ConfigEnv.BOT_TOKEN}})
                 .then(r => {
                     if (!r) {
                         config.create({
@@ -128,8 +131,9 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 bot_chat_id: ctx.chat.id,
                                 bot_token: ConfigEnv.BOT_TOKEN,
                                 login_wxid: '',
-                                setting: defaultSetting
-                            }
+                                setting: defaultSetting,
+                                bot_id: bot.botInfo.id,
+                            },
                         }).then(() => {
                             TgClient.getInstance().login().then(r => {
                                 if (r) {
