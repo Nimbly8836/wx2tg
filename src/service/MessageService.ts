@@ -67,28 +67,30 @@ export class MessageService extends Singleton<MessageService> {
                         sendMessage.isSending = false;
 
 
-                        this.prismaService.prisma.message.create({
-                            data: {
-                                from_wx_id: sendMessage.fromWxId,
-                                content: sendMessage.content,
-                                tg_msg_id: resMsg?.message_id,
-                                wx_msg_id: sendMessage.ext?.wxMsgId,
-                                parent_id: sendMessage.parentId,
-                                wx_msg_user_name: sendMessage.wxMsgUserName,
-                                wx_msg_text: sendMessage.ext?.wxMsgText,
-                                wx_msg_type: sendMessage.wxMsgType,
-                                wx_msg_type_text: sendMessage.wxMsgTypeText,
-                                group: {
-                                    connect: {
-                                        tg_group_id: sendMessage.chatId,
+                        if (sendMessage.record) {
+                            this.prismaService.prisma.message.create({
+                                data: {
+                                    from_wx_id: sendMessage.fromWxId,
+                                    content: sendMessage.content,
+                                    tg_msg_id: resMsg?.message_id,
+                                    wx_msg_id: sendMessage.ext?.wxMsgId,
+                                    parent_id: sendMessage.parentId,
+                                    wx_msg_user_name: sendMessage.wxMsgUserName,
+                                    wx_msg_text: sendMessage.ext?.wxMsgText,
+                                    wx_msg_type: sendMessage.wxMsgType,
+                                    wx_msg_type_text: sendMessage.wxMsgTypeText,
+                                    group: {
+                                        connect: {
+                                            tg_group_id: sendMessage.chatId,
+                                        }
                                     }
                                 }
-                            }
-                        }).then(() => {
-                            this.logDebug('Message saved');
-                        }).catch(e => {
-                            this.logError('Failed to save message', e, sendMessage);
-                        });
+                            }).then(() => {
+                                this.logDebug('Message saved');
+                            }).catch(e => {
+                                this.logError('Failed to save message', e, sendMessage);
+                            });
+                        }
                     }).catch(e => {
                     this.logError('Failed to send message', e);
 

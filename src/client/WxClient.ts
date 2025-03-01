@@ -11,14 +11,17 @@ import {SendMessage} from "../base/IMessage";
 import {defaultSetting} from "../util/SettingUtils";
 import {parseSysMsgPayload} from "../util/MessageUtils";
 import TgClient from "./TgClient";
+import {Markup} from "telegraf";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number
     private messageSet: Set<string> = new Set();
-    private wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
-    private prismaService = PrismaService.getInstance(PrismaService)
+    private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
+    private readonly prismaService = PrismaService.getInstance(PrismaService)
+
+    public friendshipList = []
 
 
     private constructor() {
@@ -146,50 +149,56 @@ export class WxClient extends AbstractClient<GeweBot> {
     sendMessage(msgParams: SendMessage): Promise<Record<string, any>> {
         return new Promise<Record<string, any>>((resolve, reject) => {
             // 查找是群还是用户
-            this.prismaService.prisma.group.findUniqueOrThrow({
-                where: {
-                    tg_group_id: msgParams.chatId
-                },
-                include: {
-                    wx_room: true,
-                    wx_contact: true
-                }
-            }).then(group => {
-                const send = (to: Contact | Room) => {
-                    switch (msgParams.msgType) {
-                        case "text":
-                            this.logDebug('wx 发消息', msgParams)
-                            to.say(msgParams.content).then(resolve).catch(reject)
-                            break;
-                        case 'video': // 视频使用文件类型
-                        case "file":
-                        case "audio":
-                        case "image":
-                            const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
-                            const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
-                                msgParams.fileName, forceType)
-                            to.say(fileBox).then(resolve).catch(reject)
-                            break;
-                        default:
-                            break;
+            this.prismaService.getConfigCurrentLoginWxAndToken()
+                .then(res => {
+                    this.prismaService.prisma.group.findUniqueOrThrow({
+                        where: {
+                            tg_group_id: msgParams.chatId,
+                            config_id: res.id,
+                        },
+                        include: {
+                            wx_room: true,
+                            wx_contact: true
+                        }
+                    }).then(group => {
+                        const send = (to: Contact | Room) => {
+                            switch (msgParams.msgType) {
+                                case "text":
+                                    this.logDebug('wx 发消息', msgParams)
+                                    to.say(msgParams.content).then(resolve).catch(reject)
+                                    break;
+                                case 'video': // 视频使用文件类型
+                                case "file":
+                                case "audio":
+                                case "image":
+                                    const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
+                                    const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
+                                        msgParams.fileName, forceType)
+                                    to.say(fileBox).then(resolve).catch(reject)
+                                    break;
+                                default:
+                                    break;
 
-                    }
-                }
-                if (group.is_wx_room && group?.wx_room?.chatroomId) {
-                    // @ts-ignore
-                    this.bot.Room.find({id: group?.wx_room?.chatroomId}).then(room => {
-                        send(room)
-                    })
-                } else if (group.wx_contact?.userName) {
-                    this.bot.Contact.find({id: group.wx_contact?.userName}).then(contact => {
-                        send(contact)
-                    }).catch((e) => {
-                        this.logError('find contact error : %s', e)
-                    })
-                }
+                            }
+                        }
+                        if (group.is_wx_room && group?.wx_room?.chatroomId) {
+                            // @ts-ignore
+                            this.bot.Room.find({id: group?.wx_room?.chatroomId}).then(room => {
+                                send(room)
+                            })
+                        } else if (group.wx_contact?.userName) {
+                            this.bot.Contact.find({id: group.wx_contact?.userName}).then(contact => {
+                                send(contact)
+                            }).catch((e) => {
+                                this.logError('find contact error : %s', e)
+                            })
+                        }
 
-            }).catch(e => {
-                this.logError('WxClient find group error: %s', e)
+                    }).catch(e => {
+                        this.logError('WxClient find group error: %s', e)
+                    })
+                }).catch(e => {
+                reject(e)
             })
 
         })
@@ -243,8 +252,35 @@ export class WxClient extends AbstractClient<GeweBot> {
                 }
             }
         )
-        this.bot.on('room-invite', async (msg) => {
+        this.bot.on('room-invite', async (roomInvitation) => {
 
+        })
+        this.bot.on('friendship', (friendship) => {
+            // @ts-ignore
+            if (this.isDuplicateMessage(friendship.fromId)) {
+                return
+            }
+
+            this.friendshipList.push(friendship)
+            const tgBotClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+            tgBotClient.sendMessage({
+                msgType: 'text',
+                // @ts-ignore
+                content: `<b>${friendship.fromName}</b> 请求添加您为好友:\n  ${friendship.hello()}`,
+                ext: {
+                    parse_mode: 'HTML',
+                    reply_markup: {
+                        // @ts-ignore
+                        inline_keyboard: [[Markup.button.callback('接受', `fr:${friendship.fromId}`)]]
+                    }
+                },
+                record: false,
+            }).catch(e => {
+                tgBotClient.sendMessage({
+                    msgType: "text",
+                    content: '接收到了好友请求，请在手机查看'
+                })
+            })
         })
         // this.bot.on('all', payload => {
         //     // this.logDebug('on all', payload)

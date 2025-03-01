@@ -1,4 +1,4 @@
-import {Telegraf} from "telegraf";
+import {Markup, Telegraf} from "telegraf";
 import {Singleton} from "../base/IService";
 import {MessageService} from "./MessageService";
 import {ClientEnum} from "../constant/ClientConstants";
@@ -24,6 +24,9 @@ import {TgMessageUtils} from "../util/TgMessageUtils";
 import {Api} from "telegram/tl";
 import {config} from "dotenv";
 import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
+import {join} from "node:path";
+import FileUtils from "../util/FileUtils";
+import {ConverterHelper} from "../util/FfmpegUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
@@ -353,21 +356,17 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     public onMessage(bot: Telegraf) {
         bot.on(message('text'), async (ctx, next) => {
             const text = ctx.message.text;
-            this.logDebug('进来了 bot.on(message(\'text\')')
             // 这是等待 TG 登陆输入的消息 直接跳过
             if (this.tgClient.waitingReplyOnLogin.includes(ctx.message.message_id)) {
-                this.logDebug('这是等待 TG 登陆输入的消息 直接跳过')
                 return next();
             }
             // 命令跳过
             if (text.startsWith('/')) {
-                this.logDebug('命令跳过')
                 return next()
             }
             const group = await this.prismaService.prisma.group.findUniqueOrThrow({
                 where: {tg_group_id: ctx.chat.id}
             })
-            this.logDebug('find to send group', group)
             if (!group.forward) {
                 return next()
             }
@@ -421,6 +420,81 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.on(message('voice'), async ctx => {
             ctx.reply('暂不支持语音消息')
+        })
+
+        bot.on(message('sticker'), ctx => {
+
+            const fileId = ctx.message.sticker.file_id
+            ctx.telegram.getFileLink(fileId).then(async fileLink => {
+                const uniqueId = ctx.message.sticker.file_unique_id
+                const href = fileLink.href
+                const fileName = `${uniqueId}-${href.substring(href.lastIndexOf('/') + 1, href.length)}`
+                const saveFile = `${Constants.DOWNLOAD_PATH}/${fileName}`
+                const gifFile = `${Constants.DOWNLOAD_PATH}/${fileName.slice(0, fileName.lastIndexOf('.'))}.gif`
+
+                const lottie_config = {
+                    width: 128,
+                    height: 128
+                }
+
+                // 微信不能发超过1Mb的gif文件
+                if (saveFile.endsWith('.tgs')) {
+                    lottie_config.width = 512
+                    lottie_config.height = 512
+                }
+
+                const sendGif = (saveFile: string, gifFile: string, lottie_config?: {
+                    width?: number,
+                    height?: number
+                }) => {
+                    if (!fs.existsSync(gifFile)) {
+                        const converterHelper = new ConverterHelper();
+                        let converterToGif: Promise<void>
+                        if (saveFile.endsWith('.tgs')) {
+                            converterToGif = converterHelper.tgsToGif(saveFile, gifFile, lottie_config)
+                        } else if (saveFile.endsWith('.webm')) {
+                            converterToGif = converterHelper.webmToGif(saveFile, gifFile)
+                        } else if (saveFile.endsWith('.webp')) {
+                            converterToGif = converterHelper.webpToGif(saveFile, gifFile)
+                        }
+                        converterToGif.then(() => {
+                            this.wxClient.sendMessage({
+                                msgType: 'file',
+                                chatId: ctx.chat.id,
+                                content: '',
+                                file: new Buffer(gifFile),
+                                fileName: 'sticker.gif',
+                            })
+                        })
+                    } else {
+                        this.wxClient.sendMessage({
+                            msgType: 'file',
+                            chatId: ctx.chat.id,
+                            content: '',
+                            file: new Buffer(gifFile),
+                            fileName: 'sticker.gif',
+                        })
+                    }
+                }
+
+                // gif 文件存在
+                if (fs.existsSync(gifFile)) {
+                    sendGif(saveFile, gifFile, lottie_config)
+                } else if (!fs.existsSync(saveFile)) {
+                    FileUtils.downloadFile(fileLink.toString(), saveFile, true)
+                        .then(() => {
+                            sendGif(saveFile, gifFile, lottie_config)
+                        }).catch(() => ctx.reply('发送失败'))
+                } else {
+                    sendGif(saveFile, gifFile, lottie_config)
+                }
+            }).catch(e => {
+                ctx.reply('发送失败', {
+                    reply_parameters: {
+                        message_id: ctx.message.message_id
+                    }
+                })
+            })
         })
 
     }
@@ -1104,6 +1178,31 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     })
                 })
             }
+        })
+
+        bot.action(/^fr:(.*)$/, async ctx => {
+            const wxId = ctx.match[1]
+            const friend = this.wxClient.friendshipList.find(it => it.fromId === wxId)
+            if (friend) {
+                friend.accept()
+                ctx.answerCbQuery('添加成功')
+                ctx.editMessageReplyMarkup({
+                    inline_keyboard: [[
+                        Markup.button.callback('添加成功', 'doNothing')
+                    ]]
+                })
+            } else {
+                ctx.answerCbQuery('好友请求已过期')
+                ctx.editMessageReplyMarkup({
+                    inline_keyboard: [[
+                        Markup.button.callback('好友请求已过期', 'doNothing')
+                    ]]
+                })
+            }
+        })
+
+        bot.action('doNothing', async (ctx) => {
+            return ctx.answerCbQuery()
         })
     }
 

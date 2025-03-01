@@ -20,6 +20,8 @@ export type SendMessage = {
     resMessageId?: string,
     wxMsgType?: number,
     wxMsgTypeText?: string,
+    // 是否存到数据库中
+    record?: boolean | true
 }
 
 export type SendingMessage = SendMessage & {
