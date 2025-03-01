@@ -123,14 +123,13 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 return
             }
             const config = this.prismaService.config()
-            config.findUnique({where: {bot_token: ConfigEnv.BOT_TOKEN}})
+            config.findFirst({where: {bot_token: ConfigEnv.BOT_TOKEN}})
                 .then(r => {
                     if (!r) {
                         config.create({
                             data: {
                                 bot_chat_id: ctx.chat.id,
                                 bot_token: ConfigEnv.BOT_TOKEN,
-                                login_wxid: '',
                                 setting: defaultSetting,
                                 bot_id: bot.botInfo.id,
                             },
@@ -430,7 +429,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     private setting(bot: Telegraf) {
         bot.settings(ctx => {
             // 获取数据库中的设置数据
-            this.prismaService.getConfigByToken().then(async config => {
+            this.prismaService.getConfigCurrentLoginWxAndToken().then(async config => {
                 const settings = config.setting as SettingType
                 let needUpdate = false
                 for (let defaultSettingKey in defaultSetting) {
@@ -463,7 +462,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.action(/^setting:(.*)$/, async (ctx) => {
             const settingKey = ctx.match[1];
-            this.prismaService.getConfigByToken().then(async config => {
+            this.prismaService.getConfigCurrentLoginWxAndToken().then(async config => {
                 const settings = config.setting as SettingType;
 
                 // 切换设置
@@ -544,7 +543,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         bot.action(/^clickUser:(.*)$/, async (ctx) => {
             // bot 里面根据是否存在创建群组
             const userName = ctx.match[1]
-            this.prismaService.getConfigByToken().then(config => {
+            this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                 // 在 bot 的聊天内去创建群组
                 if (ctx.chat.id == Number(config.bot_chat_id)) {
                     this.prismaService.prisma.group.findFirst({
@@ -588,7 +587,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     })
                 } else {
                     // 更新绑定
-                    this.prismaService.getConfigByToken().then(config => {
+                    this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                         // 查询用户表
                         this.prismaService.prisma.wx_contact.findUniqueOrThrow({
                             where: {
@@ -696,7 +695,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.action(/^clickRoom:(.*)$/, async (ctx) => {
             const chatroomId = ctx.match[1]
-            this.prismaService.getConfigByToken().then(config => {
+            this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                 // 在 bot 的聊天内去创建群组
                 if (ctx.chat.id == Number(config.bot_chat_id)) {
                     this.prismaService.prisma.group.findFirst({
@@ -739,7 +738,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     })
                 } else {
                     // 更新绑定
-                    this.prismaService.getConfigByToken().then(config => {
+                    this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                         // 查询用户表
                         this.prismaService.prisma.wx_room.findUniqueOrThrow({
                             where: {
@@ -1078,7 +1077,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 ctx.answerCbQuery()
             } else {
                 const wxMsgId = ctx.match[1]
-                this.prismaService.getConfigByToken().then(config => {
+                this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                     this.prismaService.prisma.message.findFirst({
                         where: {
                             wx_msg_id: wxMsgId,

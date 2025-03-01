@@ -1,14 +1,16 @@
 import {AbstractClient} from "../base/AbstractClient";
-import {Contact, Filebox, GeweBot, Room, WeVideo} from "gewechaty";
+import {Contact, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
 import WxMessageHelper from "../service/WxMessageHelper";
-import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
+import {defaultSetting} from "../util/SettingUtils";
+import {parseSysMsgPayload} from "../util/MessageUtils";
+import TgClient from "./TgClient";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -51,6 +53,7 @@ export class WxClient extends AbstractClient<GeweBot> {
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
 
+
             this.loginTime = new Date().getTime() / 1000
 
             if (this.ready) {
@@ -66,12 +69,46 @@ export class WxClient extends AbstractClient<GeweBot> {
                 this.bot.info().then(async info => {
                     const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
                     if (info?.wxid) {
-                        config.update({
-                            where: {bot_token: ConfigEnv.BOT_TOKEN},
-                            data: {login_wxid: info.wxid}
-                        }).then(() => {
-                            prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                        prismaService.prisma.config.findFirst({
+                            where: {
+                                bot_token: ConfigEnv.BOT_TOKEN,
+                                NOT: [
+                                    {login_wxid: info?.wxid},
+                                ]
+                            }
+                        }).then((res) => {
+                            if (!res?.login_wxid) {
+                                config.update({
+                                    where: {
+                                        id: res.id
+                                    },
+                                    data: {
+                                        login_wxid: info.wxid,
+                                    }
+                                }).then(() => {
+                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                                })
+                            }
+                            if (res) {
+                                config.create({
+                                    data: {
+                                        bot_chat_id: res.bot_chat_id,
+                                        bot_token: ConfigEnv.BOT_TOKEN,
+                                        // 复制上一份配置
+                                        setting: res.setting ?? defaultSetting,
+                                        bot_id: res.bot_id,
+                                        login_wxid: info.wxid,
+                                    },
+                                }).then().catch((err) => {
+                                    this.logDebug('已经存在')
+                                }).finally(() => {
+                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                                })
+
+                            }
+
                         })
+
                     }
                     if (this.scanPhotoMsgId) {
                         prismaService.getConfigByToken().then(findConfig => {
@@ -179,8 +216,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 }, (error, buffer) => {
                     const tgBot = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
                     if (!error) {
-                        PrismaService.getInstance(PrismaService).config()
-                            .findUnique({where: {bot_token: ConfigEnv.BOT_TOKEN}})
+                        PrismaService.getInstance(PrismaService).getConfigByToken()
                             .then(findConfig => {
                                 const chatId = findConfig.bot_chat_id
                                 tgBot.bot.telegram.sendPhoto(Number(chatId), {source: buffer},
@@ -209,6 +245,34 @@ export class WxClient extends AbstractClient<GeweBot> {
         )
         this.bot.on('room-invite', async (msg) => {
 
+        })
+        // this.bot.on('all', payload => {
+        //     // this.logDebug('on all', payload)
+        // })
+        // 撤回消息
+        this.bot.on('revoke', msg => {
+            // this.logDebug('wx revoke', msg)
+            // 这个也有问题会被触发两次
+            if (this.isDuplicateMessage(msg._newMsgId)) {
+                return
+            }
+            parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
+                const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+                this.prismaService.prisma.message.findFirstOrThrow({
+                    where: {
+                        wx_msg_id: sysMsgPayload.revokemsg?.newmsgid
+                    },
+                    include: {
+                        group: true
+                    }
+                }).then(message => {
+                    botClient.bot.telegram.sendMessage(Number(message.group.tg_group_id), '消息被撤回', {
+                        reply_parameters: {
+                            message_id: Number(message.tg_msg_id)
+                        }
+                    })
+                })
+            })
         })
     }
 

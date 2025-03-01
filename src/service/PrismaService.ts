@@ -4,8 +4,9 @@ import {Database} from "sqlite3";
 import {WxConcat, WxRoom} from "../entity/WeChatSqlite";
 import {PrismaClient} from "@prisma/client";
 import {Constants} from "../constant/Constants";
-import {updateGroupHeadImg} from "./UserClientHelper";
 import {LogUtils} from "../util/LogUtils";
+import {WxClient} from "../client/WxClient";
+import {config} from "@prisma/client";
 
 
 export default class PrismaService extends Singleton<PrismaService> {
@@ -36,10 +37,33 @@ export default class PrismaService extends Singleton<PrismaService> {
         })
     }
 
+    public async getConfigCurrentLoginWxAndToken(): Promise<config> {
+        const wxClient = WxClient.getInstance()
+        return new Promise((resolve, reject) => {
+            if (!wxClient.hasLogin) {
+                reject('微信没登陆')
+            } else {
+                wxClient.bot.info().then(info => {
+                    this.prisma.config.findUniqueOrThrow({
+                        where: {
+                            bot_token_login_wxid: {
+                                bot_token: ConfigEnv.BOT_TOKEN,
+                                login_wxid: info.wxid
+                            }
+                        }
+                    }).then((config) => {
+                        resolve(config)
+                    })
+                })
+            }
+        })
+    }
+
 
     public async createOrUpdateWxConcatAndRoom(wxid?: string) {
+        const currentConfig = await this.getConfigCurrentLoginWxAndToken();
         if (!wxid) {
-            wxid = (await this.getConfigByToken())?.login_wxid
+            wxid = currentConfig?.login_wxid
         }
         if (!wxid) {
             LogUtils.warn('createOrUpdateWxConcatAndRoom wxid is null')
@@ -52,6 +76,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                     data: rows.map(r => {
                         return {
                             wx_id: wxid,
+                            config_id: currentConfig.id,
                             ...r
                         }
                     }),
@@ -62,6 +87,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                     const updateWithWxId = filter.map(r => {
                         return {
                             wx_id: wxid,
+                            config_id: currentConfig.id,
                             ...r
                         }
                     })
@@ -78,6 +104,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                     data: rows.map(r => {
                         return {
                             wx_id: wxid,
+                            config_id: currentConfig.id,
                             ...r
                         }
                     }),
@@ -88,6 +115,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                     const updateWithWxId = filter.map(r => {
                         return {
                             wx_id: wxid,
+                            config_id: currentConfig.id,
                             ...r
                         }
                     })
@@ -216,7 +244,7 @@ export default class PrismaService extends Singleton<PrismaService> {
     }
 
     public async syncRoomDb(chatRoomId: string) {
-        return this.getConfigByToken().then(config => {
+        return this.getConfigCurrentLoginWxAndToken().then(config => {
             const sqliteDatabase = new Database(`${Constants.GEWE_PATH}/${config.login_wxid}.db`)
             sqliteDatabase.get<WxRoom>('SELECT * FROM room WHERE chatroomId = ?', [chatRoomId], (err, row) => {
                 if (row) {
@@ -224,13 +252,15 @@ export default class PrismaService extends Singleton<PrismaService> {
                         where: {
                             wx_id_chatroomId: {
                                 wx_id: config.login_wxid,
-                                chatroomId: row.chatroomId
-                            }
+                                chatroomId: row.chatroomId,
+                            },
+                            config_id: config.id,
                         },
                         update: {
                             ...row
                         }, create: {
                             wx_id: config.login_wxid,
+                            config_id: config.id,
                             ...row
                         },
                         include: {
@@ -247,7 +277,7 @@ export default class PrismaService extends Singleton<PrismaService> {
     }
 
     public async syncContactDb(userName: string) {
-        return this.getConfigByToken().then(config => {
+        return this.getConfigCurrentLoginWxAndToken().then(config => {
             const sqliteDatabase = new Database(`${Constants.GEWE_PATH}/${config.login_wxid}.db`)
             sqliteDatabase.get<WxConcat>('SELECT * FROM contact WHERE userName = ?', [userName], (err, row) => {
                 if (row) {
@@ -256,12 +286,14 @@ export default class PrismaService extends Singleton<PrismaService> {
                             wx_id_userName: {
                                 wx_id: config.login_wxid,
                                 userName: row.userName
-                            }
+                            },
+                            config_id: config.id,
                         },
                         update: {
                             ...row
                         }, create: {
                             wx_id: config.login_wxid,
+                            config_id: config.id,
                             ...row
                         }
                     }).then(() => {

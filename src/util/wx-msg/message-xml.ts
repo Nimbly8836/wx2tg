@@ -272,6 +272,26 @@ export interface appMsgXmlSchema_mmreader_item {
     summary?: string;
 }
 
+
+export interface SysMsgXmlSchema {
+    sysmsg: {
+        revokemsg: revokemsg
+    }
+}
+
+export interface SysMsgPayload {
+    revokemsg?: revokemsg
+}
+
+export interface revokemsg {
+    session?: string;
+    msgid?: string;
+    // 撤回的原消息的id
+    newmsgid?: string;
+    // 撤回的消息
+    replacemsg: string;
+}
+
 export enum AppMessageType {
     Text = 1,
     Img = 2,

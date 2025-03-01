@@ -3,7 +3,7 @@ import {
     AppMessagePayload,
     AppMsgXmlSchema,
     ChannelsMsgPayload,
-    MiniAppMsgPayload, VideoMsgPayload, WCPayInfo
+    MiniAppMsgPayload, SysMsgPayload, SysMsgXmlSchema, VideoMsgPayload, WCPayInfo
 } from "./wx-msg/message-xml";
 import {parseString} from 'xml2js'
 import {LogUtils} from "./LogUtils";
@@ -123,5 +123,15 @@ export async function parseQuoteMsg(quoteMsg: string): Promise<any> {
                         })
                 }
             })
+    })
+}
+
+export async function parseSysMsgPayload(messageContent: string): Promise<SysMsgPayload> {
+    return new Promise((resolve, reject) => {
+        xmlToJson(messageContent).then((sysMsgPayload: SysMsgXmlSchema) => {
+            return resolve({
+                revokemsg: sysMsgPayload?.sysmsg?.revokemsg,
+            });
+        })
     })
 }

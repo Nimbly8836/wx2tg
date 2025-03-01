@@ -13,14 +13,16 @@ model config {
   id          Int          @id @default(autoincrement())
   bot_chat_id BigInt
   bot_id      BigInt       @default(0)
-  bot_token   String       @db.VarChar @unique
+  bot_token   String       @db.VarChar
   // 登陆人的wxId
-  login_wxid  String       @unique @db.VarChar
+  login_wxid  String?      @db.VarChar
   setting     Json?        @db.Json
   tg_login    Boolean?     @default(false) @db.Boolean
   wx_contact  wx_contact[]
   wx_room     wx_room[]
   group       group[]
+
+  @@unique([bot_token, login_wxid])
 }
 
 model group {
@@ -78,7 +80,9 @@ model message {
 }
 
 model wx_contact {
-  wx_id           String  @db.VarChar
+  config_id       Int     @default(1) @db.Integer
+  // 冗余登陆人id
+  wx_id           String? @db.VarChar
   userName        String  @db.VarChar
   nickName        String? @db.VarChar
   pyInitial       String? @db.VarChar
@@ -100,14 +104,17 @@ model wx_contact {
   city            String? @db.VarChar
   phoneNumList    String? @db.VarChar
   id              Int     @id(map: "wx_contact_pk") @default(autoincrement())
-  config          config  @relation(fields: [wx_id], references: [login_wxid], onDelete: NoAction, onUpdate: NoAction)
+  // config          config  @relation(fields: [wx_id], references: [login_wxid], onDelete: NoAction, onUpdate: NoAction)
   group           group[]
+  config          config? @relation(fields: [config_id], references: [id])
 
   @@unique([wx_id, userName], map: "wx_contact_unique_index")
 }
 
 model wx_room {
-  wx_id           String  @db.VarChar
+  config_id       Int     @default(1) @db.Integer
+  // 冗余登陆人id
+  wx_id           String? @db.VarChar
   chatroomId      String  @db.VarChar
   nickName        String? @db.VarChar
   pyInitial       String? @db.VarChar
@@ -121,8 +128,8 @@ model wx_room {
   smallHeadImgUrl String? @db.VarChar
   memberList      String? @db.VarChar
   id              Int     @id(map: "wx_room_pk") @default(autoincrement())
-  config          config  @relation(fields: [wx_id], references: [login_wxid], onDelete: NoAction, onUpdate: NoAction)
   group           group[]
+  config          config? @relation(fields: [config_id], references: [id])
 
   @@unique([wx_id, chatroomId], map: "wx_room_wx_id_room_id_uindex")
 }

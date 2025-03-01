@@ -32,6 +32,6 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
 
 
-networks:
-  wx2tg_net:
-    driver: bridge
+#networks:
+#  wx2tg_net:
+#    driver: bridge

@@ -254,7 +254,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
             return
         }
 
-        this.prismaService.getConfigByToken().then(async config => {
+        this.prismaService.getConfigCurrentLoginWxAndToken().then(async config => {
             if (config.setting) {
                 const setting = config.setting as SettingType
                 // 不接收公众号消息

@@ -51,7 +51,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         this.bot.on('scan', (qrcode, status) => {
             if (status === ScanStatus.Waiting || status === ScanStatus.Timeout) {
                 this.hasLogin = false
-                this.prismaService.getConfigByToken().then(config => {
+                this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                     QRCode.toBuffer(qrcode).then(buff => {
                         botClient.bot.telegram.sendPhoto(Number(config.bot_chat_id), {
                             source: buff
@@ -67,7 +67,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
 
         this.bot.on('login', async user => {
 
-            this.prismaService.getConfigByToken().then(findConfig => {
+            this.prismaService.getConfigCurrentLoginWxAndToken().then(findConfig => {
                 const chatId = findConfig.bot_chat_id
                 if (this.scanMsgId) {
                     botClient.bot.telegram.editMessageCaption(Number(chatId),
