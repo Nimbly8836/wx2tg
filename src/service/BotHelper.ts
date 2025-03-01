@@ -354,18 +354,22 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     public onMessage(bot: Telegraf) {
         bot.on(message('text'), async (ctx, next) => {
             const text = ctx.message.text;
+            this.logDebug('进来了 bot.on(message(\'text\')')
             // 这是等待 TG 登陆输入的消息 直接跳过
             if (this.tgClient.waitingReplyOnLogin.includes(ctx.message.message_id)) {
+                this.logDebug('这是等待 TG 登陆输入的消息 直接跳过')
                 return next();
             }
             // 命令跳过
             if (text.startsWith('/')) {
+                this.logDebug('命令跳过')
                 return next()
             }
-            const group = await this.prismaService.prisma.group.findUnique({
+            const group = await this.prismaService.prisma.group.findUniqueOrThrow({
                 where: {tg_group_id: ctx.chat.id}
             })
-            if (!group?.forward) {
+            this.logDebug('find to send group', group)
+            if (!group.forward) {
                 return next()
             }
             this.messageService.addMessages({

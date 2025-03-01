@@ -121,6 +121,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 const send = (to: Contact | Room) => {
                     switch (msgParams.msgType) {
                         case "text":
+                            this.logDebug('wx 发消息', msgParams)
                             to.say(msgParams.content).then(resolve).catch(reject)
                             break;
                         case 'video': // 视频使用文件类型
