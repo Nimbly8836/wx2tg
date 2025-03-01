@@ -67,7 +67,7 @@ export class MessageService extends Singleton<MessageService> {
                         sendMessage.isSending = false;
 
 
-                        if (sendMessage.record) {
+                        if (!sendMessage?.notRecord) {
                             this.prismaService.prisma.message.create({
                                 data: {
                                     from_wx_id: sendMessage.fromWxId,

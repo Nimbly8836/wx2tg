@@ -33,7 +33,7 @@ process.exit = (code) => {
                     content: '微信客户端出现异常，可能丢失消息。\n' +
                         '可以使用 /check 查看微信是否在线 \n' +
                         '如果连接异常，可以使用 /rmds （删除缓存）后重启应用',
-                    record: false,
+                    notRecord: true,
                 }).then()
             }
             LogUtils.error('gewechat process.exit code 1')

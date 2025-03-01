@@ -1165,7 +1165,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                     where: {id: msg.id},
                                     data: {
                                         // @ts-ignore
-                                        wx_hp_msg_id: res.newMsgId.toString()
+                                        wx_hp_msg_id: res.newMsgId
                                     }
                                 }).then(() => {
 

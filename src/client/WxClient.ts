@@ -274,7 +274,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                         inline_keyboard: [[Markup.button.callback('接受', `fr:${friendship.fromId}`)]]
                     }
                 },
-                record: false,
+                notRecord: true,
             }).catch(e => {
                 tgBotClient.sendMessage({
                     msgType: "text",
