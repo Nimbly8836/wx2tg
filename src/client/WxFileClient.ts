@@ -25,16 +25,36 @@ export class WxFileClient extends AbstractClient<Wechaty> {
             fs.mkdirSync(path, {recursive: true})
         }
         return new Promise<boolean>((resolve, reject) => {
-            // if (fs.existsSync('storage/Wx2Tg_File_Client.memory-card.json')) {
-            //     fs.unlinkSync('storage/Wx2Tg_File_Client.memory-card.json')
-            // }
-            // if (fs.existsSync('storage/Wx2Tg_File_Client.memory-card.json')) {
-            //
-            // }
             this.bot.start().then(async () => {
-                this.hasLogin = true
-                resolve(true)
-            }).catch(reject)
+                // 测试是否在线
+                // this.bot.say(this.bot.Contact.find())
+                try {
+                    if (!this.bot.isLoggedIn) {
+                        if (fs.existsSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)) {
+                            fs.unlinkSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)
+                        }
+                        return resolve(false)
+                    }
+                    this.bot.Contact.find({
+                        id: Constants.FILE_HELPER
+                    }).then((contact) => {
+                        contact.say('ping').then(res => {
+                            if (res) {
+                                this.hasLogin = true
+                                resolve(true)
+
+                            }
+                        })
+                    })
+                } catch (e) {
+                    this.hasLogin = false
+                    //
+                    if (fs.existsSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)) {
+                        fs.unlinkSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)
+                    }
+                    reject(e)
+                }
+            })
         })
     }
 
@@ -70,8 +90,14 @@ export class WxFileClient extends AbstractClient<Wechaty> {
             this.prismaService.getConfigCurrentLoginWxAndToken().then(findConfig => {
                 const chatId = findConfig.bot_chat_id
                 if (this.scanMsgId) {
-                    botClient.bot.telegram.editMessageCaption(Number(chatId),
-                        this.scanMsgId, null, '文件助手，登录成功')
+                    botClient.bot.telegram.deleteMessage(Number(chatId),
+                        this.scanMsgId).then(() =>
+                        botClient.sendMessage({
+                            msgType: 'text',
+                            content: '文件助手登陆成功',
+                            notRecord: true,
+                        })
+                    )
                 } else {
                     botClient.bot.telegram.sendMessage(Number(chatId), '文件助手，登录成功')
                 }

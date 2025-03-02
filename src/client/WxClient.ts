@@ -116,8 +116,14 @@ export class WxClient extends AbstractClient<GeweBot> {
                     if (this.scanPhotoMsgId) {
                         prismaService.getConfigByToken().then(findConfig => {
                             const chatId = findConfig.bot_chat_id
-                            botClient.bot.telegram.editMessageCaption(Number(chatId),
-                                this.scanPhotoMsgId, null, '微信，登录成功')
+                            botClient.bot.telegram.deleteMessage(Number(chatId),
+                                this.scanPhotoMsgId).then((res) => {
+                                botClient.sendMessage({
+                                    msgType: "text",
+                                    content: '微信登陆成功',
+                                    notRecord: true,
+                                })
+                            })
                         })
                     }
                     this.hasLogin = true

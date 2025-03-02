@@ -1146,14 +1146,10 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     }
 
     public onAction(bot: Telegraf) {
+
         bot.action(/^download:(.*)$/, async ctx => {
-            // 检查是否有登陆微信文件助手
-            if (!this.wxFileClient.hasLogin) {
-                this.wxFileClient.login().then(() => {
-                })
-                ctx.reply('请先登陆微信文件助手，然后重新点击下载')
-                ctx.answerCbQuery()
-            } else {
+
+            const sendFileUseWxFileHelper = (ctx) => {
                 const wxMsgId = ctx.match[1]
                 this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                     this.prismaService.prisma.message.findFirst({
@@ -1181,6 +1177,15 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         })
                     })
                 })
+            }
+
+            // 检查是否有登陆微信文件助手
+            if (!this.wxFileClient.hasLogin) {
+                ctx.answerCbQuery('请先登陆微信文件助手')
+                this.wxFileClient.login().then(() => {
+                })
+            } else {
+                sendFileUseWxFileHelper(ctx);
             }
         })
 
