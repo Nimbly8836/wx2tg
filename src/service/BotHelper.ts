@@ -424,6 +424,10 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
         bot.on(message('sticker'), ctx => {
 
+            if (!fs.existsSync(Constants.STICKER_PATH)) {
+                fs.mkdirSync(Constants.STICKER_PATH)
+            }
+
             const fileId = ctx.message.sticker.file_id
             ctx.telegram.getFileLink(fileId).then(async fileLink => {
                 const uniqueId = ctx.message.sticker.file_unique_id
