@@ -10,14 +10,14 @@ export default class TgsUtils {
         height?: number | 128,
     }) {
         return new Promise((resolve, reject) => {
-            const args = [inputFile, '--output', outputFile]
+            const args = [lottie_to_gif, inputFile, '--output', outputFile]
             if (lottieConfig?.height) {
                 args.push('--height', lottieConfig.height.toString())
             }
             if (lottieConfig?.width) {
                 args.push('--width', lottieConfig.width.toString())
             }
-            spawn(lottie_to_gif, args, {
+            spawn('bash', args, {
                 shell: true
             }).on('exit', (code, signal) => {
                 if (code !== 0) {
@@ -36,7 +36,7 @@ export default class TgsUtils {
                     }
                     args.push('--quality', quality.toString())
                     // console.log('tgsToGif 第二次转换 args: ' + args.join(' '))
-                    spawn(lottie_to_gif, args, {
+                    spawn('bash', args, {
                         shell: true
                     }).on('exit', code => {
                         if (code !== 0) {
