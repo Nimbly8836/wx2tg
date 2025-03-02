@@ -72,7 +72,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 this.bot.info().then(async info => {
                     const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
                     if (info?.wxid) {
-                        prismaService.prisma.config.findFirst({
+                        prismaService.prisma.config.findFirstOrThrow({
                             where: {
                                 bot_token: ConfigEnv.BOT_TOKEN,
                                 NOT: [

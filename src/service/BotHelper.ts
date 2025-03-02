@@ -466,7 +466,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 msgType: 'file',
                                 chatId: ctx.chat.id,
                                 content: '',
-                                file: new Buffer(gifFile),
+                                file: Buffer.from(fs.readFileSync(gifFile)),
                                 fileName: 'sticker.gif',
                             })
                         })
@@ -475,7 +475,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                             msgType: 'file',
                             chatId: ctx.chat.id,
                             content: '',
-                            file: new Buffer(gifFile),
+                            file: Buffer.from(fs.readFileSync(gifFile)),
                             fileName: 'sticker.gif',
                         })
                     }
