@@ -6,7 +6,7 @@ services:
       - wx2tg-db
       - gewe
     env_file:
-      - .env
+      - .env.docker
     volumes: # 示例，换成你的 volumes
       - ./storage:/app/storage
       - ./logs:/app/logs
