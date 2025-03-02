@@ -36,6 +36,7 @@ COPY prisma/ /app/prisma
 
 RUN npm i
 RUN npm install -g typescript ts-node
+RUN npx envinfo --binaries --system --npmPackages=sharp --npmGlobalPackages=sharp
 RUN npx prisma generate
 # build the app
 RUN npx tsc
