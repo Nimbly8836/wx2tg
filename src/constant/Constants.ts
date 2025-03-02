@@ -6,6 +6,8 @@ export class Constants {
 
     public static DOWNLOAD_PATH = `${Constants.SAVE_PATH}/downloads`
 
+    public static STICKER_PATH = `${Constants.DOWNLOAD_PATH}/Sticker`
+
     public static GEWE_TEMP = '_gewetemp'
 
 

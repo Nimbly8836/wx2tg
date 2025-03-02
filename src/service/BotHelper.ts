@@ -429,8 +429,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 const uniqueId = ctx.message.sticker.file_unique_id
                 const href = fileLink.href
                 const fileName = `${uniqueId}-${href.substring(href.lastIndexOf('/') + 1, href.length)}`
-                const saveFile = `${Constants.DOWNLOAD_PATH}/${fileName}`
-                const gifFile = `${Constants.DOWNLOAD_PATH}/${fileName.slice(0, fileName.lastIndexOf('.'))}.gif`
+                const saveFile = `${Constants.STICKER_PATH}/${fileName}`
+                const gifFile = `${Constants.STICKER_PATH}/${fileName.slice(0, fileName.lastIndexOf('.'))}.gif`
 
                 const lottie_config = {
                     width: 128,
@@ -439,8 +439,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
                 // 微信不能发超过1Mb的gif文件
                 if (saveFile.endsWith('.tgs')) {
-                    lottie_config.width = 512
-                    lottie_config.height = 512
+                    lottie_config.width = 256
+                    lottie_config.height = 256
                 }
 
                 const sendGif = (saveFile: string, gifFile: string, lottie_config?: {

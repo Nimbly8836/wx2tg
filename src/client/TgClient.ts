@@ -219,8 +219,11 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                                 config_id: config.id,
                             }
                         }).then(async group => {
+                            if (!group) {
+                                return
+                            }
                             // 判断是否允许转发
-                            const allowIds = group.allow_ids;
+                            const allowIds = group?.allow_ids || [];
                             // 转发所有人的，除了 id 是负的
                             let forward = true
                             // 自己部署的机器人的消息不转发
