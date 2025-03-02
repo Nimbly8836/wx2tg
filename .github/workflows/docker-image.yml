@@ -34,18 +34,37 @@ jobs:
       - name: Generate App Version
         run: echo APP_VERSION=`git describe --tags --always` >> $GITHUB_ENV
 
+      - name: Cache
+        uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            var-cache-apt
+            var-lib-apt
+          key: cache-${{ hashFiles('Dockerfile') }}
+
+      - name: inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        with:
+          cache-map: |
+            {
+              "var-cache-apt": "/var/cache/apt",
+              "var-lib-apt": "/var/lib/apt"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+
       - name: Build and push for ${{ matrix.platform }}
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: Dockerfile
           push: true
           tags: |
             xleat/wx2tg:latest
             xleat/wx2tg:${{ env.APP_VERSION }}
           platforms: linux/amd64,linux/arm64/v8
-          cache-from: type=gha  # Use GitHub Actions cache
-          cache-to: type=gha,mode=max  # Store cache for future runs
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
