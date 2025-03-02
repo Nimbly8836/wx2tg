@@ -463,7 +463,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         }
                         converterToGif.then(() => {
                             this.wxClient.sendMessage({
-                                msgType: 'file',
+                                msgType: 'image',
                                 chatId: ctx.chat.id,
                                 content: '',
                                 file: Buffer.from(fs.readFileSync(gifFile)),
@@ -472,7 +472,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         })
                     } else {
                         this.wxClient.sendMessage({
-                            msgType: 'file',
+                            msgType: 'image',
                             chatId: ctx.chat.id,
                             content: '',
                             file: Buffer.from(fs.readFileSync(gifFile)),
