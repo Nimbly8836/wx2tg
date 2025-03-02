@@ -3,7 +3,9 @@ RUN cargo install --version 1.7.0 gifski
 
 FROM gcc:13 as builder-lottie-to-png
 
-RUN apt update && \
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt update &&  \
     apt install --assume-yes git cmake python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 RUN pip3 install --break-system-packages conan==2.0.10
@@ -17,8 +19,11 @@ COPY --from=builder-gifski /usr/local/cargo/bin/gifski /usr/bin/gifski
 
 FROM node:20
 
-RUN apt update && apt-get --no-install-recommends install -y \
-    libpixman-1-0 libcairo2 libpango1.0-0 libgif7 libjpeg62-turbo libpng16-16 librsvg2-2 libvips42 librlottie0-1 \
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt update &&  \
+    apt-get --no-install-recommends install -y \
+        libpixman-1-0 libcairo2 libpango1.0-0 libgif7 libjpeg62-turbo libpng16-16 librsvg2-2 libvips42 librlottie0-1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /app/storage /app/logs
