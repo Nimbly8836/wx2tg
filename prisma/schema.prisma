@@ -14,7 +14,7 @@ model config {
   bot_chat_id BigInt
   bot_id      BigInt       @default(0)
   bot_token   String       @db.VarChar
-  // 登陆人的wxId
+  // 登录人的wxId
   login_wxid  String?      @db.VarChar
   setting     Json?        @db.Json
   tg_login    Boolean?     @default(false) @db.Boolean
@@ -81,7 +81,7 @@ model message {
 
 model wx_contact {
   config_id       Int     @default(1) @db.Integer
-  // 冗余登陆人id
+  // 冗余登录人id
   wx_id           String? @db.VarChar
   userName        String  @db.VarChar
   nickName        String? @db.VarChar
@@ -113,7 +113,7 @@ model wx_contact {
 
 model wx_room {
   config_id       Int     @default(1) @db.Integer
-  // 冗余登陆人id
+  // 冗余登录人id
   wx_id           String? @db.VarChar
   chatroomId      String  @db.VarChar
   nickName        String? @db.VarChar
@@ -140,4 +140,10 @@ model tg_entity {
   user_name  String? @db.VarChar
   first_name String? @db.VarChar
   last_name  String? @db.VarChar
+}
+
+// 过滤微信发送的消息 处理各种奇怪的消息
+model wx_msg_filter {
+  // wx 的 newMsgId
+  id String @id
 }

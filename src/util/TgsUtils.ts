@@ -8,6 +8,7 @@ export default class TgsUtils {
     async tgsToGif(inputFile: string, outputFile: string, lottieConfig?: {
         width?: number | 128,
         height?: number | 128,
+        fps?: number | 24,
     }) {
         return new Promise((resolve, reject) => {
             const args = [lottie_to_gif, inputFile, '--output', outputFile]
@@ -16,6 +17,9 @@ export default class TgsUtils {
             }
             if (lottieConfig?.width) {
                 args.push('--width', lottieConfig.width.toString())
+            }
+            if (lottieConfig?.fps) {
+                args.push('--fps', lottieConfig.fps.toString())
             }
             spawn('bash', args, {
                 shell: true
@@ -32,7 +36,7 @@ export default class TgsUtils {
                     if (quality < 0) {
                         quality = 1
                     } else if (quality > 100) {
-                        quality = 99
+                        quality = 90
                     }
                     args.push('--quality', quality.toString())
                     // console.log('tgsToGif 第二次转换 args: ' + args.join(' '))

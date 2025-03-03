@@ -42,7 +42,7 @@ export default class BotHelper extends Singleton<BotHelper> {
 
     public setCommands(bot: Telegraf): void {
         const commands = [
-            {command: 'start', description: '开始，登陆 TG User Client'},
+            {command: 'start', description: '开始，登录 TG User Client'},
             {command: 'help', description: '帮助信息'},
             {command: 'settings', description: '设置'},
             {command: 'login', description: '登录微信'},
@@ -105,11 +105,11 @@ export default class BotHelper extends Singleton<BotHelper> {
 <strong>仅用于技术研究和学习，不得用于非法用途</strong>
 
 <strong>第一次使用</strong>
-/start 开始登陆 TG User Client
-/login 登陆微信
+/start 开始登录 TG User Client
+/login 登录微信
 
 <strong>常用命令</strong>
-/user 搜索微信联系人，支持昵称、备注,及其全缩写的大写和小写的全拼
+/user 搜索微信联系人，支持昵称、备注，及其全缩写的大写和小写的全拼
 /room 搜索群组，同上
 /sc 搜索聊天记录内容
 user & room 命令在群组使用，能切换当前绑定的用户或者绑定当前群组
@@ -139,7 +139,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         }).then(() => {
                             TgClient.getInstance().login().then(r => {
                                 if (r) {
-                                    ctx.reply('Tg 登陆成功')
+                                    ctx.reply('Tg 登录成功')
                                 }
                             })
                         }).catch(e => {
@@ -158,7 +158,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         if (!r?.tg_login) {
                             TgClient.getInstance().login().then(r => {
                                 if (r) {
-                                    ctx.reply('Tg 登陆成功')
+                                    ctx.reply('Tg 登录成功')
                                 }
                             })
                         }
@@ -169,7 +169,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         bot.command('login', (ctx) => {
             let WxClient = SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT) as WxClient;
             WxClient.login().then(r => {
-                ctx.reply(r ? '登陆成功' : '登陆失败')
+                ctx.reply(r ? '登录成功' : '登录失败')
             })
         })
 
@@ -356,7 +356,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
     public onMessage(bot: Telegraf) {
         bot.on(message('text'), async (ctx, next) => {
             const text = ctx.message.text;
-            // 这是等待 TG 登陆输入的消息 直接跳过
+            // 这是等待 TG 登录输入的消息 直接跳过
             if (this.tgClient.waitingReplyOnLogin.includes(ctx.message.message_id)) {
                 return next();
             }
@@ -437,8 +437,9 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 const gifFile = `${Constants.STICKER_PATH}/${fileName.slice(0, fileName.lastIndexOf('.'))}.gif`
 
                 const lottie_config = {
-                    width: 128,
-                    height: 128
+                    width: 256,
+                    height: 256,
+                    fps: 30,
                 }
 
                 // 微信不能发超过1Mb的gif文件
@@ -450,6 +451,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 const sendGif = (saveFile: string, gifFile: string, lottie_config?: {
                     width?: number,
                     height?: number
+                    fps?: number
                 }) => {
                     if (!fs.existsSync(gifFile)) {
                         const converterHelper = new ConverterHelper();
@@ -1179,9 +1181,9 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 })
             }
 
-            // 检查是否有登陆微信文件助手
+            // 检查是否有登录微信文件助手
             if (!this.wxFileClient.hasLogin) {
-                ctx.answerCbQuery('请先登陆微信文件助手')
+                ctx.answerCbQuery('请先登录微信文件助手')
                 this.wxFileClient.login().then(() => {
                 })
             } else {

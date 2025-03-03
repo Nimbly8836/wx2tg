@@ -33,7 +33,6 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                         if (fs.existsSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)) {
                             fs.unlinkSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)
                         }
-                        return resolve(false)
                     }
                     this.bot.Contact.find({
                         id: Constants.FILE_HELPER
@@ -42,7 +41,6 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                             if (res) {
                                 this.hasLogin = true
                                 resolve(true)
-
                             }
                         })
                     })
@@ -94,7 +92,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                         this.scanMsgId).then(() =>
                         botClient.sendMessage({
                             msgType: 'text',
-                            content: '文件助手登陆成功',
+                            content: '文件助手登录成功',
                             notRecord: true,
                         })
                     )

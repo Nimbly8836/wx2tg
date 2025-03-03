@@ -1,5 +1,5 @@
 import {AbstractClient} from "../base/AbstractClient";
-import {Contact, Filebox, GeweBot, Room} from "gewechaty";
+import {Contact, ContactSelf, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
@@ -10,17 +10,17 @@ import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
 import {defaultSetting} from "../util/SettingUtils";
 import {parseSysMsgPayload} from "../util/MessageUtils";
-import TgClient from "./TgClient";
 import {Markup} from "telegraf";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
 
-    private scanPhotoMsgId: number
+    private scanPhotoMsgId: number[]
     private messageSet: Set<string> = new Set();
     private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
     private readonly prismaService = PrismaService.getInstance(PrismaService)
 
+    public me: ContactSelf
     public friendshipList = []
 
 
@@ -56,6 +56,10 @@ export class WxClient extends AbstractClient<GeweBot> {
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
 
+            if (this.hasLogin) {
+                return reject('已经登录')
+            }
+
 
             this.loginTime = new Date().getTime() / 1000
 
@@ -72,6 +76,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 this.bot.info().then(async info => {
                     const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
                     if (info?.wxid) {
+                        this.me = info
                         prismaService.prisma.config.findFirstOrThrow({
                             where: {
                                 bot_token: ConfigEnv.BOT_TOKEN,
@@ -116,11 +121,12 @@ export class WxClient extends AbstractClient<GeweBot> {
                     if (this.scanPhotoMsgId) {
                         prismaService.getConfigByToken().then(findConfig => {
                             const chatId = findConfig.bot_chat_id
-                            botClient.bot.telegram.deleteMessage(Number(chatId),
+                            botClient.bot.telegram.deleteMessages(Number(chatId),
                                 this.scanPhotoMsgId).then((res) => {
+                                this.scanPhotoMsgId = []
                                 botClient.sendMessage({
                                     msgType: "text",
-                                    content: '微信登陆成功',
+                                    content: '微信登录成功',
                                     notRecord: true,
                                 })
                             })
@@ -237,7 +243,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 tgBot.bot.telegram.sendPhoto(Number(chatId), {source: buffer},
                                     {caption: '请使用「微信」扫码登录'})
                                     .then((res) => {
-                                        this.scanPhotoMsgId = res.message_id
+                                        this.scanPhotoMsgId.push(res.message_id)
                                     })
                             })
                     }
@@ -292,10 +298,16 @@ export class WxClient extends AbstractClient<GeweBot> {
         //     // this.logDebug('on all', payload)
         // })
         // 撤回消息
-        this.bot.on('revoke', msg => {
+        this.bot.on('revoke', async msg => {
             // this.logDebug('wx revoke', msg)
             // 这个也有问题会被触发两次
             if (this.isDuplicateMessage(msg._newMsgId)) {
+                return
+            }
+            const existMsg = await this.prismaService.prisma.wx_msg_filter.findUnique({
+                where: {id: msg._newMsgId.toString()},
+            })
+            if (existMsg) {
                 return
             }
             parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
@@ -312,6 +324,10 @@ export class WxClient extends AbstractClient<GeweBot> {
                         reply_parameters: {
                             message_id: Number(message.tg_msg_id)
                         }
+                    }).then(() => {
+                        this.prismaService.prisma.wx_msg_filter.create({
+                            data: {id: msg._newMsgId.toString()}
+                        }).then()
                     })
                 })
             })

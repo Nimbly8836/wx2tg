@@ -3,7 +3,6 @@ import * as fs from 'node:fs'
 import TgsUtils from './TgsUtils'
 import WxLimitConstants from '../constant/WxLimitConstant'
 import sharp from 'sharp'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const ffmpeg = require('fluent-ffmpeg')
 
 export class ConverterHelper {
@@ -71,7 +70,8 @@ export class ConverterHelper {
 
     async tgsToGif(inputFile: string | Buffer, outputFile: string, lottie_config?: {
         width?: number,
-        height?: number
+        height?: number,
+        fps?: number
     }): Promise<void> {
         if (typeof inputFile === 'string') {
             return new TgsUtils().tgsToGif(inputFile, outputFile, lottie_config)

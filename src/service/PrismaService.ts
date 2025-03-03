@@ -41,20 +41,19 @@ export default class PrismaService extends Singleton<PrismaService> {
         const wxClient = WxClient.getInstance()
         return new Promise((resolve, reject) => {
             if (!wxClient.hasLogin) {
-                reject('微信没登陆')
+                reject('微信没登录')
             } else {
-                wxClient.bot.info().then(info => {
-                    this.prisma.config.findUniqueOrThrow({
-                        where: {
-                            bot_token_login_wxid: {
-                                bot_token: ConfigEnv.BOT_TOKEN,
-                                login_wxid: info.wxid
-                            }
+                this.prisma.config.findUniqueOrThrow({
+                    where: {
+                        bot_token_login_wxid: {
+                            bot_token: ConfigEnv.BOT_TOKEN,
+                            login_wxid: wxClient.me.wxid
                         }
-                    }).then((config) => {
-                        resolve(config)
-                    })
+                    }
+                }).then((config) => {
+                    resolve(config)
                 })
+
             }
         })
     }
