@@ -1308,7 +1308,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 })
 
             } else {
-                this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
+                this.wxClient.bot.Contact.find({wxid: group.wx_id}).then(findWxContact => {
                     findWxContact.sync().then(syncedContact => {
                         this.logDebug('syncedContact', syncedContact)
                         // 更新头像
