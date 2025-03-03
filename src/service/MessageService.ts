@@ -1,11 +1,11 @@
-import {AbstractService, Singleton} from "../base/IService";
+import {Singleton} from "../base/IService";
 import {SendingMessage, SendMessage} from "../base/IMessage";
 import {Snowflake} from "nodejs-snowflake";
 import {ClientEnum} from "../constant/ClientConstants";
 import IClient from "../base/IClient";
 import {SimpleClientFactory} from "../base/Factory";
-import {LogUtils} from "../util/LogUtils";
 import PrismaService from "./PrismaService";
+import TgClient from "../client/TgClient";
 
 export class MessageService extends Singleton<MessageService> {
     public static readonly snowflake = new Snowflake();
@@ -61,6 +61,7 @@ export class MessageService extends Singleton<MessageService> {
                 sendMessage.isSending = true;
                 const client = this.clients.get(sendMessage.client);
 
+                // TODO 发送前保存消息，发送后更新消息
                 client.sendMessage(sendMessage)
                     .then(resMsg => {
                         sendMessage.success = true;
@@ -130,6 +131,19 @@ export class MessageService extends Singleton<MessageService> {
                         this.logError(`Max retries reached for message: ${sendMessage.content}`)
                         sendMessage.isSending = false
                         sendMessage.success = false // Mark as failed
+                        // 发送提示
+                        const tgClient = this.clients.get(ClientEnum.TG_BOT) as TgClient;
+                        // 发送失败提示
+                        tgClient.sendMessage({
+                            msgType: 'text',
+                            chatId: sendMessage.chatId,
+                            content: '消息发送失败',
+                            // ext: {
+                            //     reply_parameters: {
+                            //         message_id:
+                            //     }
+                            // }
+                        }).then()
                     }
                 });
             }

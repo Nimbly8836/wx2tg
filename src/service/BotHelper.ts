@@ -11,7 +11,6 @@ import {initPaginationCallback, PagedResult, registerPagination, sendPagedList} 
 import {tg_entity, wx_contact, wx_room} from "@prisma/client";
 import * as fs from "node:fs";
 import {message} from "telegraf/filters";
-import {LogUtils} from "../util/LogUtils";
 import {Constants} from "../constant/Constants";
 import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
 import {createChannel, updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
@@ -22,9 +21,7 @@ import {MsgType} from "../base/IMessage";
 import {DownloadMediaInterface} from "telegram/client/downloads";
 import {TgMessageUtils} from "../util/TgMessageUtils";
 import {Api} from "telegram/tl";
-import {config} from "dotenv";
 import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
-import {join} from "node:path";
 import FileUtils from "../util/FileUtils";
 import {ConverterHelper} from "../util/FfmpegUtils";
 
@@ -373,6 +370,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             this.messageService.addMessages({
                 msgType: 'text',
                 chatId: ctx.chat.id,
+                tgMsgId: ctx.message.message_id,
                 content: text,
             }, ClientEnum.WX_BOT)
         })
@@ -383,6 +381,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
+                tgMsgId: ctx.message.message_id,
                 type: 'file',
                 ctx: ctx,
             })
@@ -393,6 +392,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 chatId: ctx.chat.id,
                 text: ctx.text,
                 message_id: ctx.message.message_id,
+                tgMsgId: ctx.message.message_id,
                 type: 'image',
                 ctx: ctx,
             })
@@ -404,6 +404,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 text: ctx.text,
                 message_id: ctx.message.message_id,
                 type: 'file', // 用文件类型发送
+                tgMsgId: ctx.message.message_id,
                 ctx: ctx,
             })
         })
@@ -415,6 +416,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 message_id: ctx.message.message_id,
                 type: 'file', // 用文件类型发送
                 ctx: ctx,
+                tgMsgId: ctx.message.message_id,
             })
         })
 
@@ -464,22 +466,29 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                             converterToGif = converterHelper.webpToGif(saveFile, gifFile)
                         }
                         converterToGif.then(() => {
-                            this.wxClient.sendMessage({
+                            this.messageService.addMessages({
                                 msgType: 'image',
                                 chatId: ctx.chat.id,
+                                tgMsgId: ctx.message.message_id,
                                 content: '',
                                 file: Buffer.from(fs.readFileSync(gifFile)),
                                 fileName: 'sticker.gif',
-                            })
-                        })
+                            }, ClientEnum.WX_BOT)
+                        }).catch(() =>
+                            ctx.reply('发送失败, 文件转换失败', {
+                                reply_parameters: {
+                                    message_id: ctx.message.message_id
+                                }
+                            }))
                     } else {
-                        this.wxClient.sendMessage({
+                        this.messageService.addMessages({
                             msgType: 'image',
                             chatId: ctx.chat.id,
+                            tgMsgId: ctx.message.message_id,
                             content: '',
                             file: Buffer.from(fs.readFileSync(gifFile)),
                             fileName: 'sticker.gif',
-                        })
+                        }, ClientEnum.WX_BOT)
                     }
                 }
 
@@ -490,7 +499,12 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     FileUtils.downloadFile(fileLink.toString(), saveFile, true)
                         .then(() => {
                             sendGif(saveFile, gifFile, lottie_config)
-                        }).catch(() => ctx.reply('发送失败'))
+                        }).catch(() =>
+                        ctx.reply('发送失败', {
+                            reply_parameters: {
+                                message_id: ctx.message.message_id
+                            }
+                        }))
                 } else {
                     sendGif(saveFile, gifFile, lottie_config)
                 }
@@ -1221,10 +1235,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         chatId: number,
         text: string,
         message_id: number,
+        tgMsgId: number,
         type?: string,
         ctx: any,
     }) {
-        const {chatId, text, message_id, type} = sendParams
+        const {chatId, text, message_id, type, tgMsgId} = sendParams
         // 是自己发送的不处理
         if (TgMessageUtils.popMessage(chatId, message_id)) {
             this.logDebug('自己发送的文件，不处理')
@@ -1240,6 +1255,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             this.messageService.addMessages({
                 msgType: 'text',
                 chatId: chatId,
+                tgMsgId: tgMsgId,
                 content: text,
             }, ClientEnum.WX_BOT)
         }

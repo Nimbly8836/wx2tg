@@ -16,6 +16,8 @@ export type SendMessage = {
     wxMsgUserName?: string,
     parentId?: number,
     replyId?: number,
+    // tg 群组的原始消息的id
+    tgMsgId?: number,
     // 返回的消息id
     resMessageId?: string,
     wxMsgType?: number,
