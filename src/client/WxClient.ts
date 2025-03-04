@@ -15,7 +15,7 @@ import {Markup} from "telegraf";
 
 export class WxClient extends AbstractClient<GeweBot> {
 
-    private scanPhotoMsgId: number[]
+    private scanPhotoMsgId: number[] = []
     private messageSet: Set<string> = new Set();
     private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
     private readonly prismaService = PrismaService.getInstance(PrismaService)
@@ -64,7 +64,7 @@ export class WxClient extends AbstractClient<GeweBot> {
             this.loginTime = new Date().getTime() / 1000
 
             if (this.ready) {
-                return this.bot.login()
+                return this.bot.login().then(resolve).catch(reject)
             }
 
             this.bot.start().then(async ({app, router}) => {
@@ -118,7 +118,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                         })
 
                     }
-                    if (this.scanPhotoMsgId) {
+                    if (this.scanPhotoMsgId?.length > 0) {
                         prismaService.getConfigByToken().then(findConfig => {
                             const chatId = findConfig.bot_chat_id
                             botClient.bot.telegram.deleteMessages(Number(chatId),
@@ -129,6 +129,8 @@ export class WxClient extends AbstractClient<GeweBot> {
                                     content: '微信登录成功',
                                     notRecord: true,
                                 })
+                            }).catch((err) => {
+                                this.logError('删除消息', this.scanPhotoMsgId, err)
                             })
                         })
                     }
@@ -294,9 +296,10 @@ export class WxClient extends AbstractClient<GeweBot> {
                 })
             })
         })
-        // this.bot.on('all', payload => {
-        //     // this.logDebug('on all', payload)
-        // })
+        this.bot.on('all', payload => {
+            this.logDebug('on all', payload)
+            // payload.type
+        })
         // 撤回消息
         this.bot.on('revoke', async msg => {
             // this.logDebug('wx revoke', msg)

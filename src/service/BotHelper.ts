@@ -167,6 +167,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             let WxClient = SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT) as WxClient;
             WxClient.login().then(r => {
                 ctx.reply(r ? '登录成功' : '登录失败')
+            }).catch(err => {
+                ctx.reply('登录失败：', err)
             })
         })
 
@@ -174,6 +176,8 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             // 删除 ds.json 文件
             if (fs.existsSync(`${Constants.GEWE_DS}`)) {
                 fs.unlinkSync(`${Constants.GEWE_DS}`)
+                // 直接标记成未登录
+                this.wxClient.hasLogin = false
             }
             ctx.reply('成功')
         })
@@ -361,18 +365,24 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             if (text.startsWith('/')) {
                 return next()
             }
-            const group = await this.prismaService.prisma.group.findUniqueOrThrow({
+            this.prismaService.prisma.group.findUnique({
                 where: {tg_group_id: ctx.chat.id}
+            }).then(group => {
+                if (!group?.forward) {
+                    return next()
+                }
+                this.messageService.addMessages({
+                    msgType: 'text',
+                    chatId: ctx.chat.id,
+                    tgMsgId: ctx.message.message_id,
+                    content: text,
+                }, ClientEnum.WX_BOT)
             })
-            if (!group.forward) {
-                return next()
-            }
-            this.messageService.addMessages({
-                msgType: 'text',
-                chatId: ctx.chat.id,
-                tgMsgId: ctx.message.message_id,
-                content: text,
-            }, ClientEnum.WX_BOT)
+
+        })
+
+        bot.on(message('reply_to_message'), async (ctx, next) => {
+
         })
 
 
@@ -784,7 +794,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 columns: 3
             }, {
                 keyword: queryUser,
-            })
+            }).then()
         })
 
         bot.action(/^clickRoom:(.*)$/, async (ctx) => {
