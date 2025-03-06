@@ -10,6 +10,8 @@ export class Constants {
 
     public static GEWE_TEMP = '_gewetemp'
 
+    public static GEWE_UPLOAD_PATH = `${Constants.SAVE_PATH}/${Constants.GEWE_TEMP}`
+
 
     public static WX_FILE_CLIENT = 'storage/Wx2Tg_File_Client'
 }

@@ -14,6 +14,8 @@ import {NewMessage} from "telegram/events";
 import {groupIds, initGroupIds} from "../util/CacheUtils";
 import {MessageService} from "../service/MessageService";
 import QRCode from "qrcode";
+import {Contact} from "gewechaty";
+import {Constants} from "../constant/Constants";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
@@ -258,15 +260,19 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                                 }, ClientEnum.WX_BOT)
 
                                 if (event.message.media) {
-                                    event.message.downloadMedia().then(async media => {
-                                        const mimeTypeSplit = event.message.file.mimeType?.split('/');
-                                        const notNamedFile = `${event.chatId}-${event.message.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`
+                                    const mimeTypeSplit = event.message.file.mimeType?.split('/');
+                                    const notNamedFile = `${event.chatId}-${event.message.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`
+                                    const fileName = event.message.file.name || notNamedFile
+                                    const outputFile = Constants.GEWE_UPLOAD_PATH + '/' + fileName;
+                                    event.message.downloadMedia({
+                                        outputFile: outputFile,
+                                    }).then(async media => {
                                         messageService.addMessages({
                                             content: "",
-                                            msgType: 'file',
+                                            msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
                                             chatId: event.chatId.toJSNumber(),
-                                            file: media,
-                                            fileName: event.message.file.name || notNamedFile,
+                                            file: outputFile,
+                                            fileName: fileName,
                                         }, ClientEnum.WX_BOT)
                                     })
                                 }

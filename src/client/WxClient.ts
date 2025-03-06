@@ -11,6 +11,7 @@ import {SendMessage} from "../base/IMessage";
 import {defaultSetting} from "../util/SettingUtils";
 import {parseSysMsgPayload} from "../util/MessageUtils";
 import {Markup} from "telegraf";
+import fs from "node:fs";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -54,6 +55,11 @@ export class WxClient extends AbstractClient<GeweBot> {
 
 
     login(): Promise<boolean> {
+        // 发送文件需要的路径 暂时写死, 不改 ge_wechaty
+        const path = Constants.GEWE_UPLOAD_PATH;
+        if (!fs.existsSync(path)) {
+            fs.mkdirSync(path, {recursive: true})
+        }
         return new Promise<boolean>((resolve, reject) => {
 
             if (this.hasLogin) {
@@ -94,7 +100,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                         login_wxid: info.wxid,
                                     }
                                 }).then(() => {
-                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid).then()
                                 })
                             }
                             if (res) {
@@ -110,7 +116,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 }).then().catch((err) => {
                                     this.logDebug('已经存在')
                                 }).finally(() => {
-                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid)
+                                    prismaService.createOrUpdateWxConcatAndRoom(info.wxid).then()
                                 })
 
                             }
@@ -186,8 +192,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 case "audio":
                                 case "image":
                                     const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
-                                    const fileBox = Filebox.fromBuff(msgParams.file as Buffer,
-                                        msgParams.fileName, forceType)
+                                    const fileBox = Filebox.fromUrl(msgParams.file as string, forceType)
                                     to.say(fileBox).then(resolve).catch(reject)
                                     break;
                                 default:

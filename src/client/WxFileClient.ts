@@ -19,11 +19,6 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     private tgClient = TgClient.getInstance();
 
     login(): Promise<boolean> {
-        // 发送文件需要的路径 暂时写死, 不改 ge_wechaty
-        const path = `${ConfigEnv.GEWE_STATIC}/${Constants.GEWE_TEMP}`;
-        if (!fs.existsSync(path)) {
-            fs.mkdirSync(path, {recursive: true})
-        }
         return new Promise<boolean>((resolve, reject) => {
             this.bot.start().then(async () => {
                 // 测试是否在线

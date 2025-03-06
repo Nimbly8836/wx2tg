@@ -18,7 +18,6 @@ import {RoomMemberType} from "../entity/Contact";
 import {WxFileClient} from "../client/WxFileClient";
 import {forward} from "../util/GewePostUtils";
 import {MsgType} from "../base/IMessage";
-import {DownloadMediaInterface} from "telegram/client/downloads";
 import {TgMessageUtils} from "../util/TgMessageUtils";
 import {Api} from "telegram/tl";
 import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
@@ -1270,23 +1269,28 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             }, ClientEnum.WX_BOT)
         }
         let msgType: MsgType = type as MsgType ?? 'file'
-        let downloadParams: DownloadMediaInterface = {}
+
+
         this.tgClient.bot.getMessages(chatId, {ids: [message_id]})
             .then(msgs => {
                 msgs.forEach(msg => {
-                    msg.downloadMedia(downloadParams)
+
+                    const mimeTypeSplit = msg.file.mimeType?.split('/');
+                    const notNamedFile = `${chatId}-${msg.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`
+                    const fileName = msg.file.name || notNamedFile
+                    const outputFile = Constants.GEWE_UPLOAD_PATH + '/' + fileName;
+
+                    msg.downloadMedia({
+                        outputFile: outputFile,
+                    })
                         .then(file => {
-                            const mimeTypeSplit = msg.file.mimeType?.split('/');
-                            this.wxClient.sendMessage({
-                                msgType: msgType,
+                            this.messageService.addMessages({
+                                msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
                                 chatId: chatId,
                                 content: '',
                                 file: file,
-                                fileName: msg.file.name
-                                    ?? `${chatId}-${msg.id}-${mimeTypeSplit?.[0]}.${mimeTypeSplit?.[1]}`,
-                            }).then().catch(e => {
-                                sendParams.ctx?.reply('文件发送失败')
-                            })
+                                fileName: fileName,
+                            }, ClientEnum.WX_BOT)
                         }).catch(e => {
                         sendParams.ctx?.reply('文件下载失败')
                     })
@@ -1359,7 +1363,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                             updateGroupTitle(syncedContact._alias ? syncedContact._alias : syncedContact._name, ctx.chat.id)
                                 .then()
                         }
-                        this.prismaService.syncContactDb(syncedContact._wxid)
+                        this.prismaService.syncContactDb(syncedContact._wxid).then()
                     }).catch(e => {
                         this.logError('syncContact', e)
                         ctx.reply('同步失败')
@@ -1369,7 +1373,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             }
         }).catch(e => {
             ctx.reply('没绑定当前群组')
-            this.prismaService.createOrUpdateWxConcatAndRoom()
+            this.prismaService.createOrUpdateWxConcatAndRoom().then()
         })
     }
 }
