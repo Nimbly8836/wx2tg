@@ -106,7 +106,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                 } else {
                     // 重复的消息不处理，经过一段时间还是有可能有重复的消息
                     this.prismaService.prisma.message.findFirst({
-                        where: {wx_msg_id: msg._newMsgId, group_id: existGroup.id},
+                        where: {wx_msg_id: msg._newMsgId?.toString(), group_id: existGroup.id},
                     }).then(async (message) => {
                         if (message) {
                             this.logDebug('重复消息 id: %s', message.id)
@@ -393,7 +393,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             const editMsgImage = (fileBox: Filebox) => {
                                 this.prismaService.prisma.message.findFirst({
-                                    where: {wx_msg_id: msg._newMsgId, from_wx_id: msg.fromId},
+                                    where: {wx_msg_id: msg._newMsgId?.toString(), from_wx_id: msg.fromId},
                                     include: {group: true}
                                 }).then(existingMessage => {
                                     const tgGroupId = Number(existingMessage?.group?.tg_group_id);
@@ -450,6 +450,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             break;
                         case wxMsgType.Voice:
                             addMessage.content = msg._self ? '发送[语音]' : '收到[语音]'
+                            addMessage.ext.wxMsgText = msg.text()
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             break;
                         case wxMsgType.Emoji:

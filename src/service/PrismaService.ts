@@ -47,11 +47,13 @@ export default class PrismaService extends Singleton<PrismaService> {
                     where: {
                         bot_token_login_wxid: {
                             bot_token: ConfigEnv.BOT_TOKEN,
-                            login_wxid: wxClient.me.wxid
+                            login_wxid: wxClient.me?.wxid
                         }
                     }
                 }).then((config) => {
                     resolve(config)
+                }).catch((err) => {
+                    this.logError('tgClient 查找 config 错误')
                 })
 
             }
