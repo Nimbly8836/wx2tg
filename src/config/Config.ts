@@ -22,7 +22,7 @@ export const ConfigEnv = {
     GEWE_PORT: Number(process.env.GEWE_PORT) || 3000,
     GEWE_PROXY: process.env.GEWE_PROXY || '',
     GEWE_STATIC: process.env.GEWE_STATIC || 'storage',
-    GEWE_IP: process.env.GEWE_IP || '',
+    GEWE_IP: process.env.GEWE_IP,
 }
 
 export type ProxyOptions = {

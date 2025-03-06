@@ -12,6 +12,7 @@ import {defaultSetting} from "../util/SettingUtils";
 import {parseSysMsgPayload} from "../util/MessageUtils";
 import {Markup} from "telegraf";
 import fs from "node:fs";
+import {getBaseHttpAddress} from "../util/Gewechaty";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -192,7 +193,11 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 case "audio":
                                 case "image":
                                     const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
-                                    const fileBox = Filebox.fromUrl(msgParams.file as string, forceType)
+                                    let file = msgParams.file as string;
+                                    if (!file.startsWith('http')) {
+                                        file = new URL(file.substring(Constants.SAVE_PATH.length), getBaseHttpAddress()).toString();
+                                    }
+                                    const fileBox = Filebox.fromUrl(file, forceType)
                                     to.say(fileBox).then(resolve).catch(reject)
                                     break;
                                 default:
