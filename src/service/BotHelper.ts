@@ -1288,7 +1288,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
                                 chatId: chatId,
                                 content: '',
-                                file: file,
+                                file: outputFile,
                                 fileName: fileName,
                             }, ClientEnum.WX_BOT)
                         }).catch(e => {

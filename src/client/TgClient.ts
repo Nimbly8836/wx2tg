@@ -16,6 +16,7 @@ import {MessageService} from "../service/MessageService";
 import QRCode from "qrcode";
 import {Contact} from "gewechaty";
 import {Constants} from "../constant/Constants";
+import {DeletedMessage} from "telegram/events/DeletedMessage";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
@@ -283,6 +284,11 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             }, new NewMessage({
                 incoming: true,
             }))
+
+            // 删除消息自动撤回
+            // this.bot.addEventHandler(event => {}, new DeletedMessage({
+            //         chats:
+            // }))
         }
     }
 
