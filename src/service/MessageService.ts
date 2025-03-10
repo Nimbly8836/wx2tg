@@ -84,6 +84,8 @@ export class MessageService extends Singleton<MessageService> {
                                     wx_msg_text: sendMessage.ext?.wxMsgText,
                                     wx_msg_type: sendMessage.wxMsgType,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText,
+                                    msg_id: sendMessage.ext?.msgId,
+                                    wx_msg_create: sendMessage.ext?.wxMsgCreate,
                                     group: {
                                         connect: {
                                             tg_group_id: sendMessage.chatId,
@@ -100,6 +102,8 @@ export class MessageService extends Singleton<MessageService> {
                                     wx_msg_text: sendMessage.ext?.wxMsgText,
                                     wx_msg_type: sendMessage.wxMsgType ?? resMsg?.type,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText ?? sendMessage.msgType,
+                                    wx_msg_create: sendMessage.ext?.wxMsgCreate ?? resMsg?.createTime,
+                                    msg_id: sendMessage.ext?.msgId ?? resMsg?.msgId,
                                 },
                             }).then(() => {
                                 this.logDebug('Message saved');

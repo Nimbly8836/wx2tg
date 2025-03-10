@@ -314,6 +314,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         wxMsgType: msg._type,
                         ext: {
                             wxMsgId: msg._newMsgId,
+                            msgId: msg._msgId,
+                            wxMsgCreate: msg._createTime,
                         }
                     }
                     switch (msg.type()) {

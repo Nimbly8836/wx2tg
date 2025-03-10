@@ -1,5 +1,5 @@
 import {Contact} from "gewechaty";
-import {ForwardFile, ForwardImage, ForwardMiniApp, ForwardUrl, ForwardVideo, SendText} from "./GeweApi";
+import {ForwardFile, ForwardImage, ForwardMiniApp, ForwardUrl, ForwardVideo, revokeMsg, SendText} from "./GeweApi";
 import {getAppId} from "./DS";
 import {MessageType} from "../entity/Message";
 import {LogUtils} from "./LogUtils";
@@ -55,4 +55,19 @@ export const forward = async (content, contact: string | Contact, type: string) 
             LogUtils.error('无法转发的消息类型', type)
     }
 
+}
+
+export const revoke = async (content: {
+    toWxid: string,
+    msgId: string,
+    newMsgId: string,
+    createTime: number
+}) => {
+    return revokeMsg({
+        appId: getAppId(),
+        toWxid: content.toWxid,
+        msgId: content.msgId,
+        newMsgId: content.newMsgId,
+        createTime: content.createTime,
+    })
 }

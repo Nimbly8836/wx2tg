@@ -14,9 +14,11 @@ import {NewMessage} from "telegram/events";
 import {groupIds, initGroupIds} from "../util/CacheUtils";
 import {MessageService} from "../service/MessageService";
 import QRCode from "qrcode";
-import {Contact} from "gewechaty";
 import {Constants} from "../constant/Constants";
-import {DeletedMessage} from "telegram/events/DeletedMessage";
+import {DeletedMessage, DeletedMessageEvent} from "telegram/events/DeletedMessage";
+import {WxClient} from "./WxClient";
+import {revokeMsg} from "../util/GeweApi";
+import {revoke} from "../util/GewePostUtils";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
@@ -285,10 +287,47 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                 incoming: true,
             }))
 
-            // 删除消息自动撤回
-            // this.bot.addEventHandler(event => {}, new DeletedMessage({
-            //         chats:
-            // }))
+            // 删除消息撤回
+            this.bot.addEventHandler(event => {
+                this.prismaService.prisma.group.findUnique({
+                    where: {
+                        tg_group_id: event.chatId.toJSNumber(),
+                    }
+                }).then(async group => {
+                    if (group) {
+                        this.prismaService.prisma.message.findFirst({
+                            where: {
+                                group_id: group.id,
+                                tg_msg_id: event._messageId,
+                            }
+                        }).then(async message => {
+                            revoke({
+                                toWxid: message.from_wx_id,
+                                msgId: message.msg_id,
+                                newMsgId: message.wx_msg_id,
+                                createTime: message.wx_msg_create,
+                            }).then(r => {
+                                // @ts-ignore
+                                if (r.ret === 200) {
+                                    this.prismaService.prisma.message.update({
+                                        where: {
+                                            id: message.id,
+                                        },
+                                        data: {
+                                            is_deleted: 1
+                                        }
+                                    }).then()
+
+                                }
+                            })
+                        })
+                    }
+                })
+            }, new DeletedMessage({
+                func: (event: DeletedMessageEvent) => {
+                    return groupIds.has(event.chatId.toJSNumber())
+                }
+            }))
         }
     }
 

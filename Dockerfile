@@ -1,13 +1,12 @@
-FROM rust:buster as builder-gifski
+FROM rust:buster AS builder-gifski
 RUN cargo install --version 1.7.0 gifski
 
-FROM gcc:13 as builder-lottie-to-png
+FROM gcc:13 AS builder-lottie-to-png
 
-RUN apt update && \
-    apt install --assume-yes git cmake python3 python3-pip && \
-    rm -rf /var/lib/apt/lists/*
-RUN pip3 install --break-system-packages conan==2.0.10
-RUN git clone --branch v1.1.1 https://github.com/ed-asriyan/lottie-converter.git /application
+RUN apt-get update && apt-get install --assume-yes cmake git python3 python3-pip \
+  && rm -rf /var/lib/apt/lists/* \
+  && pip3 install --break-system-packages conan==2.0.10 \
+  && git clone --branch v1.1.1 https://github.com/ed-asriyan/lottie-converter.git /application
 
 WORKDIR /application
 RUN conan profile detect
@@ -17,11 +16,18 @@ COPY --from=builder-gifski /usr/local/cargo/bin/gifski /usr/bin/gifski
 
 FROM node:20
 
-RUN apt update && apt-get --no-install-recommends install -y \
-    libpixman-1-0 libcairo2 libpango1.0-0 libgif7 libjpeg62-turbo libpng16-16 librsvg2-2 libvips42 librlottie0-1 \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /app/storage /app/logs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2  \
+    libgif7  \
+    libjpeg62-turbo  \
+    libpango1.0-0  \
+    libpixman-1-0  \
+    libpng16-16  \
+    librlottie0-1 \
+    librsvg2-2  \
+    libvips42  \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/storage /app/logs
 
 WORKDIR /app
 COPY --from=builder-gifski /usr/local/cargo/bin/gifski /usr/bin/gifski
@@ -34,11 +40,10 @@ COPY package*.json tsconfig.json ./
 COPY src/ /app/src
 COPY prisma/ /app/prisma
 
-RUN npm i
-RUN npm install -g typescript ts-node
-RUN npx envinfo --binaries --system --npmPackages=sharp --npmGlobalPackages=sharp
-RUN npx prisma generate
-# build the app
-RUN npx tsc
+RUN npm i  \
+  && npm install -g typescript ts-node \
+  && npx envinfo --binaries --system --npmPackages=sharp --npmGlobalPackages=sharp \
+  && npx prisma generate \
+  && npx tsc
 
 CMD [ "npm", "start" ]

@@ -56,8 +56,12 @@ model message {
   content          String?   @db.VarChar
   is_deleted       Int?      @default(0) @db.SmallInt
   parent_id        BigInt?
-  // 微信消息id
+  // 微信消息id newMsgId
   wx_msg_id        String?   @db.VarChar
+  // 微信 msgId
+  msg_id           String?   @db.VarChar
+  // wx_msg_create
+  wx_msg_create    Int?
   // 转发到微信文件助手的id
   wx_hp_msg_id     String?   @db.VarChar
   // msg.text() 获取的原始消息内容，需要的时候存储
