@@ -361,7 +361,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 return next();
             }
             // 命令跳过
-            if (text.startsWith('/')) {
+            if (text.match(/^\/[a-z]+(@[a-zA-Z0-9_]+)?(\s.*)?$/)) {
                 return next()
             }
             this.prismaService.prisma.group.findUnique({

@@ -103,7 +103,7 @@ export class MessageService extends Singleton<MessageService> {
                                     wx_msg_type: sendMessage.wxMsgType ?? resMsg?.type,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText ?? sendMessage.msgType,
                                     wx_msg_create: sendMessage.ext?.wxMsgCreate ?? resMsg?.createTime,
-                                    msg_id: sendMessage.ext?.msgId ?? resMsg?.msgId,
+                                    msg_id: sendMessage.ext?.msgId ?? resMsg?.msgId.toString(),
                                 },
                             }).then(() => {
                                 this.logDebug('Message saved');

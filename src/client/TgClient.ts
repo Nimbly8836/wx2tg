@@ -302,7 +302,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                             }
                         }).then(async message => {
                             revoke({
-                                toWxid: message.from_wx_id,
+                                toWxid: group.wx_id,
                                 msgId: message.msg_id,
                                 newMsgId: message.wx_msg_id,
                                 createTime: message.wx_msg_create,
