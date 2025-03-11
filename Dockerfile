@@ -40,8 +40,8 @@ COPY package*.json tsconfig.json ./
 COPY src/ /app/src
 COPY prisma/ /app/prisma
 
-RUN npm i --ignore-scripts \
-  && npm install --ignore-scripts -g typescript ts-node \
+RUN npm i \
+  && npm i -g typescript ts-node \
   && npx envinfo --binaries --system --npmPackages=sharp --npmGlobalPackages=sharp \
   && npx prisma generate \
   && npx tsc
