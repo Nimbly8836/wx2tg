@@ -364,6 +364,9 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             if (text.match(/^\/[a-z]+(@[a-zA-Z0-9_]+)?(\s.*)?$/)) {
                 return next()
             }
+
+            const replyMessageId = ctx.update.message['reply_to_message']?.message_id
+
             this.prismaService.prisma.group.findUnique({
                 where: {tg_group_id: ctx.chat.id}
             }).then(group => {
@@ -371,18 +374,19 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     return next()
                 }
                 this.messageService.addMessages({
-                    msgType: 'text',
+                    msgType: replyMessageId ? 'quote' : 'text',
                     chatId: ctx.chat.id,
                     tgMsgId: ctx.message.message_id,
                     content: text,
+                    replyId: replyMessageId,
                 }, ClientEnum.WX_BOT)
             })
 
         })
 
-        bot.on(message('reply_to_message'), async (ctx, next) => {
-
-        })
+        // bot.on(message('reply_to_message'), async (ctx, next) => {
+        //
+        // })
 
 
         bot.on(message('document'), async ctx => {
@@ -1283,14 +1287,14 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     msg.downloadMedia({
                         outputFile: outputFile,
                     }).then(file => {
-                            this.messageService.addMessages({
-                                msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
-                                chatId: chatId,
-                                content: '',
-                                file: outputFile,
-                                fileName: fileName,
-                            }, ClientEnum.WX_BOT)
-                        }).catch(e => {
+                        this.messageService.addMessages({
+                            msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
+                            chatId: chatId,
+                            content: '',
+                            file: outputFile,
+                            fileName: fileName,
+                        }, ClientEnum.WX_BOT)
+                    }).catch(e => {
                         sendParams.ctx?.reply('文件下载失败')
                     })
                 })

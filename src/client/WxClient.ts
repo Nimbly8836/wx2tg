@@ -13,6 +13,7 @@ import {parseSysMsgPayload} from "../util/MessageUtils";
 import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
+import {quote} from "../util/GewePostUtils";
 
 
 export class WxClient extends AbstractClient<GeweBot> {
@@ -199,6 +200,20 @@ export class WxClient extends AbstractClient<GeweBot> {
                                     }
                                     const fileBox = Filebox.fromUrl(file, forceType)
                                     to.say(fileBox).then(resolve).catch(reject)
+                                    break;
+                                case "quote":
+                                    this.prismaService.prisma.message.findFirst({
+                                        where: {
+                                            group_id: group.id,
+                                            tg_msg_id: msgParams.tgMsgId
+                                        }
+                                    }).then(quoteMsg => {
+                                        quote({
+                                            title: quoteMsg.content,
+                                            toWxId: group.wx_id,
+                                            msgId: quoteMsg.wx_msg_id
+                                        }).then()
+                                    })
                                     break;
                                 default:
                                     break;

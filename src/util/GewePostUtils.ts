@@ -1,5 +1,14 @@
 import {Contact} from "gewechaty";
-import {ForwardFile, ForwardImage, ForwardMiniApp, ForwardUrl, ForwardVideo, revokeMsg, SendText} from "./GeweApi";
+import {
+    ForwardFile,
+    ForwardImage,
+    ForwardMiniApp,
+    ForwardUrl,
+    ForwardVideo,
+    revokeMsg,
+    SendAppMsg,
+    SendText
+} from "./GeweApi";
 import {getAppId} from "./DS";
 import {MessageType} from "../entity/Message";
 import {LogUtils} from "./LogUtils";
@@ -57,6 +66,7 @@ export const forward = async (content, contact: string | Contact, type: string) 
 
 }
 
+// 撤回
 export const revoke = async (content: {
     toWxid: string,
     msgId: string,
@@ -69,5 +79,19 @@ export const revoke = async (content: {
         msgId: content.msgId,
         newMsgId: content.newMsgId,
         createTime: content.createTime,
+    })
+}
+
+// 引用
+export const quote = async (message: {
+    title: string,
+    msgId: string,
+    toWxId: string,
+}) => {
+    const msg = `<appmsg appid="" sdkver="0"><title>${message.title}</title><des /><action /><type>57</type><showtype>0</showtype><soundtype>0</soundtype><mediatagname /><messageext /><messageaction /><content /><contentattr>0</contentattr><url /><lowurl /><dataurl /><lowdataurl /><songalbumurl /><songlyric /><appattach><totallen>0</totallen><attachid /><emoticonmd5 /><fileext /><aeskey /></appattach><extinfo /><sourceusername /><sourcedisplayname /><thumburl /><md5 /><statextstr /><refermsg><type>1</type><svrid>${message.msgId}</svrid><chatusr>${message.toWxId}</chatusr></refermsg></appmsg>`
+    return SendAppMsg({
+        appId: getAppId(),
+        toWxid: message.toWxId,
+        appmsg: msg,
     })
 }
