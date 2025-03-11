@@ -412,10 +412,10 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                     }
 
                                     // 这里有可能是消息还没保存到数据库，所以 tgGroupId 为空
-                                    if (!tgGroupId) {
+                                    if (!tgGroupId || !existingMessage.tg_msg_id) {
                                         setTimeout(() => {
                                             editMsgImage(fileBox)
-                                        }, 1000)
+                                        }, 1500)
                                     }
 
                                 })

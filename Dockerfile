@@ -3,7 +3,7 @@ RUN cargo install --version 1.7.0 gifski
 
 FROM gcc:13 AS builder-lottie-to-png
 
-RUN apt-get update && apt-get install --assume-yes cmake git python3 python3-pip \
+RUN apt-get update && apt-get install -y --no-install-recommends cmake git python3 python3-pip \
   && rm -rf /var/lib/apt/lists/* \
   && pip3 install --break-system-packages conan==2.0.10 \
   && git clone --branch v1.1.1 https://github.com/ed-asriyan/lottie-converter.git /application
@@ -40,8 +40,8 @@ COPY package*.json tsconfig.json ./
 COPY src/ /app/src
 COPY prisma/ /app/prisma
 
-RUN npm i  \
-  && npm install -g typescript ts-node \
+RUN npm i --ignore-scripts \
+  && npm install --ignore-scripts -g typescript ts-node \
   && npx envinfo --binaries --system --npmPackages=sharp --npmGlobalPackages=sharp \
   && npx prisma generate \
   && npx tsc

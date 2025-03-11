@@ -1282,8 +1282,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
 
                     msg.downloadMedia({
                         outputFile: outputFile,
-                    })
-                        .then(file => {
+                    }).then(file => {
                             this.messageService.addMessages({
                                 msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
                                 chatId: chatId,

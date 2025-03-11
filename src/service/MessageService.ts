@@ -78,14 +78,14 @@ export class MessageService extends Singleton<MessageService> {
                                     from_wx_id: sendMessage.fromWxId,
                                     content: sendMessage.content,
                                     tg_msg_id: sendMessage.tgMsgId ?? resMsg?.message_id,
-                                    wx_msg_id: sendMessage.ext?.wxMsgId,
+                                    wx_msg_id: sendMessage.ext?.wxMsgId?.toString(),
                                     parent_id: sendMessage.parentId,
                                     wx_msg_user_name: sendMessage.wxMsgUserName,
                                     wx_msg_text: sendMessage.ext?.wxMsgText,
                                     wx_msg_type: sendMessage.wxMsgType,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText,
-                                    msg_id: sendMessage.ext?.msgId,
-                                    wx_msg_create: sendMessage.ext?.wxMsgCreate,
+                                    msg_id: sendMessage.ext?.msgId?.toString(),
+                                    wx_msg_create: Number(sendMessage.ext?.wxMsgCreate),
                                     group: {
                                         connect: {
                                             tg_group_id: sendMessage.chatId,
@@ -102,8 +102,8 @@ export class MessageService extends Singleton<MessageService> {
                                     wx_msg_text: sendMessage.ext?.wxMsgText,
                                     wx_msg_type: sendMessage.wxMsgType ?? resMsg?.type,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText ?? sendMessage.msgType,
-                                    wx_msg_create: sendMessage.ext?.wxMsgCreate ?? resMsg?.createTime,
-                                    msg_id: sendMessage.ext?.msgId ?? resMsg?.msgId.toString(),
+                                    wx_msg_create: Number(sendMessage.ext?.wxMsgCreate) ?? Number(resMsg?.createTime),
+                                    msg_id: sendMessage.ext?.msgId?.toString() ?? resMsg?.msgId.toString(),
                                 },
                             }).then(() => {
                                 this.logDebug('Message saved');
