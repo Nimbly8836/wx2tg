@@ -7,19 +7,16 @@ import type {config, group} from '@prisma/client'
 import {WxClient} from "../client/WxClient";
 import {ClientEnum} from "../constant/ClientConstants";
 import {MessageService} from "./MessageService";
-import {LogUtils} from "../util/LogUtils";
 import {parseAppMsgMessagePayload, parseQuoteMsg} from "../util/MessageUtils";
 import {SendMessage} from "../base/IMessage";
 import FileUtils from "../util/FileUtils";
 import {SettingType} from "../util/SettingUtils";
 import {CustomFile} from "telegram/client/uploads";
-import {createChannel, insertDbUpdateAvatar} from "./UserClientHelper";
+import {createChannel} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
 import {MessageType} from "../entity/Message";
-import {addToGroupIds} from "../util/CacheUtils";
-// import {Settings} from "../util/SettingUtils";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
@@ -33,7 +30,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
     }
 
     public async getTitle(msg: Message): Promise<string> {
-        return new Promise<string>((resolve, reject) => {
+        return new Promise<string>((resolve) => {
             if (msg.isRoom) {
                 msg.room().then(room => {
                     if (room) {
@@ -275,13 +272,13 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                     const chatId = Number(res.tg_group_id);
                     let content = msg.text()
                     let title = ''
-                    let wx_msg_user_name = ''
+                    let wx_msg_user_name: string | void = ''
+                    const talker = await msg.talker();
                     if (msg._self) {
                         title = '你:'
                         wx_msg_user_name = '你'
                     } else {
-                        const talker = await msg.talker();
-                        wx_msg_user_name = talker._alias ?? talker._name
+                        wx_msg_user_name = (await talker.alias()) ?? talker.name()
                     }
                     if (msg.isRoom) {
                         const wx_room = await this.prismaService.prisma.wx_room.findUnique({
@@ -309,8 +306,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                         content: content,
                         title: title,
                         msgType: 'text',
-                        fromWxId: msg.fromId,
-                        wxMsgUserName: wx_msg_user_name,
+                        fromWxId: talker.wxid(),
+                        wxMsgUserName: wx_msg_user_name || '',
                         wxMsgType: msg._type,
                         ext: {
                             wxMsgId: msg._newMsgId,
@@ -370,7 +367,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                                         },
                                         msgType: 'quote',
                                     }, ClientEnum.TG_BOT)
-                                }).catch(e => {
+                                }).catch(() => {
                                     this.messageService.addMessages({
                                         ...addMessage,
                                         content: quoteMsg?.title,

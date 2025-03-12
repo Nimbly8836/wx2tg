@@ -16,8 +16,6 @@ import {MessageService} from "../service/MessageService";
 import QRCode from "qrcode";
 import {Constants} from "../constant/Constants";
 import {DeletedMessage, DeletedMessageEvent} from "telegram/events/DeletedMessage";
-import {WxClient} from "./WxClient";
-import {revokeMsg} from "../util/GeweApi";
 import {revoke} from "../util/GewePostUtils";
 
 

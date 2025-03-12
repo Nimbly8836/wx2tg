@@ -53,7 +53,7 @@ export default class PrismaService extends Singleton<PrismaService> {
                 }).then((config) => {
                     resolve(config)
                 }).catch((err) => {
-                    this.logError('tgClient 查找 config 错误')
+                    this.logError('tgClient 查找 config 错误 %s', err)
                 })
 
             }

@@ -205,7 +205,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                     this.prismaService.prisma.message.findFirst({
                                         where: {
                                             group_id: group.id,
-                                            tg_msg_id: msgParams.tgMsgId
+                                            tg_msg_id: msgParams.replyId
                                         }
                                     }).then(quoteMsg => {
                                         quote({

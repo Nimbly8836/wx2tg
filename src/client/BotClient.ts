@@ -7,7 +7,6 @@ import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import PrismaService from "../service/PrismaService";
 import TgClient from "./TgClient";
 import {WxClient} from "./WxClient";
-import {LogUtils} from "../util/LogUtils";
 import {defaultSetting} from "../util/SettingUtils";
 
 export default class BotClient extends AbstractClient<Telegraf> {

@@ -9,7 +9,6 @@ import BotClient from "./BotClient";
 import * as fs from "node:fs";
 import {Constants} from "../constant/Constants";
 import TgClient from "./TgClient";
-import {ConfigEnv} from "../config/Config";
 import {TgMessageUtils} from "../util/TgMessageUtils";
 
 

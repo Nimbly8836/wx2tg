@@ -2,12 +2,9 @@
 import FileUtils from "../util/FileUtils";
 import {CustomFile} from "telegram/client/uploads";
 import {Api} from "telegram";
-import {Message} from "gewechaty";
 import {LogUtils} from "../util/LogUtils";
 import PrismaService from "./PrismaService";
-import WxMessageHelper from "./WxMessageHelper";
 import TgClient from "../client/TgClient";
-import {BigInteger} from "big-integer";
 import {returnBigInt} from "telegram/Helpers";
 import {addToGroupIds} from "../util/CacheUtils";
 
