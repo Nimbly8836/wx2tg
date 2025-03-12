@@ -285,6 +285,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                 }
             }, new NewMessage({
                 incoming: true,
+                forwards: true,
             }))
 
             // 删除消息撤回

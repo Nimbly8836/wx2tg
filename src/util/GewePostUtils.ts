@@ -12,6 +12,7 @@ import {
 import {getAppId} from "./DS";
 import {MessageType} from "../entity/Message";
 import {LogUtils} from "./LogUtils";
+import {quoteAppMsg} from "./wx-msg/message-generate";
 
 export const forward = async (content, contact: string | Contact, type: string) => {
     let toWxId = ''
@@ -85,10 +86,11 @@ export const revoke = async (content: {
 // 引用
 export const quote = async (message: {
     title: string,
-    msgId: string,
+    content: string,
+    newMsgId: string,
     toWxId: string,
 }) => {
-    const msg = `<appmsg appid="" sdkver="0"><title>${message.title}</title><des /><action /><type>57</type><showtype>0</showtype><soundtype>0</soundtype><mediatagname /><messageext /><messageaction /><content /><contentattr>0</contentattr><url /><lowurl /><dataurl /><lowdataurl /><songalbumurl /><songlyric /><appattach><totallen>0</totallen><attachid /><emoticonmd5 /><fileext /><aeskey /></appattach><extinfo /><sourceusername /><sourcedisplayname /><thumburl /><md5 /><statextstr /><refermsg><type>1</type><svrid>${message.msgId}</svrid><chatusr>${message.toWxId}</chatusr></refermsg></appmsg>`
+    const msg = quoteAppMsg(message)
     return SendAppMsg({
         appId: getAppId(),
         toWxid: message.toWxId,

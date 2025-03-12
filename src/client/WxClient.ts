@@ -209,9 +209,10 @@ export class WxClient extends AbstractClient<GeweBot> {
                                         }
                                     }).then(quoteMsg => {
                                         quote({
-                                            title: quoteMsg.content,
-                                            toWxId: group.wx_id,
-                                            msgId: quoteMsg.wx_msg_id
+                                            title: msgParams.content,
+                                            toWxId: quoteMsg.from_wx_id,
+                                            newMsgId: quoteMsg.wx_msg_id,
+                                            content: quoteMsg.content,
                                         }).then()
                                     })
                                     break;
