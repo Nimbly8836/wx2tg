@@ -10,7 +10,7 @@ services:
 #    restart: unless-stopped
 
   gewe:
-    image: xleat/gewe:alpine
+    image: xleat/gewe:latest
     container_name: gewe
     volumes: # 示例，换成你的 volumes
       - ./temp:/root/temp
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   wx2tg-db:
-    image: postgres
+    image: postgres:17.4
     container_name: wx2tg-db
     restart: unless-stopped
     volumes: # 示例，换成你的 volumes

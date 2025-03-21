@@ -20,10 +20,10 @@ import {MessageType} from "../entity/Message";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
-    private prismaService = PrismaService.getInstance(PrismaService);
-    private messageService = MessageService.getInstance(MessageService);
-    private tgUserClient = TgClient.getInstance()
-    private tgBotClient = BotClient.getInstance()
+    private readonly prismaService = PrismaService.getInstance(PrismaService);
+    private readonly messageService = MessageService.getInstance(MessageService);
+    private readonly tgUserClient = TgClient.getInstance()
+    private readonly tgBotClient = BotClient.getInstance()
 
     constructor() {
         super();
@@ -50,7 +50,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             });
                     }
                     // 自己的情况下 名称用对方的
-                    if (contact._wxid === msg.wxid) {
+                    if (contact.wxid() === msg.wxid) {
                         msg.to().then(toContact => {
                             getTitle(toContact)
                         })
@@ -73,7 +73,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
         if (msg._self) {
             wxId = msg.isRoom ? msg.roomId : msg.toId
         }
-        return new Promise(async (resolve, reject) => {
+        return new Promise((resolve, reject) => {
 
             // 重复的消息不处理，经过一段时间还是有可能有重复的消息
 
@@ -107,55 +107,53 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                     }).then(async (message) => {
                         if (message) {
                             this.logDebug('重复消息 id: %s', message.id)
-                            reject('重复消息')
-                        } else {
-                            if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
-                                await this.prismaService.createOrUpdateWxConcatAndRoom()
-                                // 重新查询
-                                if (msg.isRoom) {
-                                    this.prismaService.prisma.wx_room.findUnique({
-                                        where: {
-                                            wx_id_chatroomId: {
-                                                wx_id: msg.wxid,
-                                                chatroomId: wxId,
+                            reject(new Error('重复消息, 不处理'))
+                        } else if (!existGroup?.wx_room_id || !existGroup?.wx_contact_id) {
+                            await this.prismaService.createOrUpdateWxConcatAndRoom()
+                            // 重新查询
+                            if (msg.isRoom) {
+                                this.prismaService.prisma.wx_room.findUnique({
+                                    where: {
+                                        wx_id_chatroomId: {
+                                            wx_id: msg.wxid,
+                                            chatroomId: wxId,
+                                        }
+                                    },
+                                }).then((roomInPg => {
+                                    if (roomInPg) {
+                                        existGroup.wx_room_id = roomInPg.id
+                                        this.prismaService.prisma.group.update({
+                                            where: {id: existGroup.id},
+                                            data: {
+                                                wx_room_id: roomInPg.id,
                                             }
-                                        },
-                                    }).then((roomInPg => {
-                                        if (roomInPg) {
-                                            existGroup.wx_room_id = roomInPg.id
-                                            this.prismaService.prisma.group.update({
-                                                where: {id: existGroup.id},
-                                                data: {
-                                                    wx_room_id: roomInPg.id,
-                                                }
-                                            }).then()
-                                            resolve(existGroup)
-                                        }
-                                    }))
-                                } else {
-                                    this.prismaService.prisma.wx_contact.findUnique({
-                                        where: {
-                                            wx_id_userName: {
-                                                wx_id: msg.wxid,
-                                                userName: wxId,
-                                            }
-                                        }
-                                    }).then((contactInPg => {
-                                        if (contactInPg) {
-                                            existGroup.wx_contact_id = contactInPg.id
-                                            this.prismaService.prisma.group.update({
-                                                where: {id: existGroup.id},
-                                                data: {
-                                                    wx_contact_id: contactInPg.id,
-                                                }
-                                            }).then()
-                                            resolve(existGroup)
-                                        }
-                                    }))
-                                }
+                                        }).then()
+                                        resolve(existGroup)
+                                    }
+                                }))
                             } else {
-                                resolve(existGroup)
+                                this.prismaService.prisma.wx_contact.findUnique({
+                                    where: {
+                                        wx_id_userName: {
+                                            wx_id: msg.wxid,
+                                            userName: wxId,
+                                        }
+                                    }
+                                }).then((contactInPg => {
+                                    if (contactInPg) {
+                                        existGroup.wx_contact_id = contactInPg.id
+                                        this.prismaService.prisma.group.update({
+                                            where: {id: existGroup.id},
+                                            data: {
+                                                wx_contact_id: contactInPg.id,
+                                            }
+                                        }).then()
+                                        resolve(existGroup)
+                                    }
+                                }))
                             }
+                        } else {
+                            resolve(existGroup)
                         }
                     })
                     // 检查头像是否需要更新
@@ -237,7 +235,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                     })
                 }
             }).catch(e => {
-                reject(e)
+                reject(new Error(e))
             })
         })
 
@@ -385,7 +383,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             break;
                         // 文件类型的消息
-                        case wxMsgType.Image:
+                        case wxMsgType.Image: {
                             // 先发送文字
                             addMessage.content = msg._self ? '你发送了[图片]' : '收到[图片]'
                             addMessage.wxMsgTypeText = MessageType.Image;
@@ -446,6 +444,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                             }
 
                             processFileBox(msg)
+                        }
                             break;
                         case wxMsgType.Voice:
                             addMessage.content = msg._self ? '发送[语音]' : '收到[语音]'
@@ -499,6 +498,24 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
                 }
 
+            })
+        })
+    }
+
+
+    public async isDuplicateMessage(msgId: string): Promise<boolean> {
+        return new Promise(resolve => {
+            this.prismaService.prisma.wx_msg_filter.findUnique({
+                where: {id: msgId},
+            }).then((res) => {
+                if (!res) {
+                    this.prismaService.prisma.wx_msg_filter.create({
+                        data: {id: msgId},
+                    }).then()
+                    return resolve(false);
+                } else {
+                    return resolve(true);
+                }
             })
         })
     }

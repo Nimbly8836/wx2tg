@@ -19,7 +19,6 @@ import {quote} from "../util/GewePostUtils";
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number[] = []
-    private messageSet: Set<string> = new Set();
     private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
     private readonly prismaService = PrismaService.getInstance(PrismaService)
 
@@ -65,7 +64,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         return new Promise<boolean>((resolve, reject) => {
 
             if (this.hasLogin) {
-                return reject('已经登录')
+                return reject(new Error("Login failed."));
             }
 
 
@@ -152,7 +151,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 resolve(true)
 
             }).catch(e => {
-                reject(e)
+                reject(new Error(e))
             })
 
             this.onMessage(null)
@@ -192,7 +191,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 case 'video': // 视频使用文件类型
                                 case "file":
                                 case "audio":
-                                case "image":
+                                case "image": {
                                     const forceType = msgParams.msgType === 'image' ? 'image' : 'file'
                                     let file = msgParams.file as string;
                                     if (!file.startsWith('http')) {
@@ -200,6 +199,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                     }
                                     const fileBox = Filebox.fromUrl(file, forceType)
                                     to.say(fileBox).then(resolve).catch(reject)
+                                }
                                     break;
                                 case "quote":
                                     this.prismaService.prisma.message.findFirst({
@@ -248,15 +248,6 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.checkOnline()
     }
 
-    private isDuplicateMessage(msgId: string): boolean {
-        if (this.messageSet.has(msgId)) {
-            return true;
-        }
-        this.messageSet.add(msgId);
-        setTimeout(() => this.messageSet.delete(msgId), 60000);
-        return false;
-    }
-
     onMessage(any: any): void {
         this.bot.on('scan', qrcode => {
             if (qrcode) {
@@ -280,9 +271,10 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         this.bot.on('message', async (msg) => {
 
-                if (this.isDuplicateMessage(msg._newMsgId)) {
+                if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId + '')) {
                     return
                 }
+
                 // 只处理登录之后的消息 且不是发送给文件助手的消息
                 // 没有类型的消息不处理，大多是通知或者无法处理的消息
                 if (msg._createTime >= this.loginTime
@@ -296,8 +288,9 @@ export class WxClient extends AbstractClient<GeweBot> {
 
         })
         this.bot.on('friendship', (friendship) => {
+
             // @ts-ignore
-            if (this.isDuplicateMessage(friendship.fromId)) {
+            if (await this.wxMessageHelper.isDuplicateMessage(friendship.fromId + '')) {
                 return
             }
 
@@ -328,15 +321,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {
-            // this.logDebug('wx revoke', msg)
-            // 这个也有问题会被触发两次
-            if (this.isDuplicateMessage(msg._newMsgId)) {
-                return
-            }
-            const existMsg = await this.prismaService.prisma.wx_msg_filter.findUnique({
-                where: {id: msg._newMsgId.toString()},
-            })
-            if (existMsg) {
+            if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId)) {
                 return
             }
             parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
