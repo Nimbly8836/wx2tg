@@ -5,13 +5,14 @@ import {WxConcat, WxRoom} from "../entity/WeChatSqlite";
 import {PrismaClient} from "@prisma/client";
 import {Constants} from "../constant/Constants";
 import {LogUtils} from "../util/LogUtils";
-import {WxClient} from "../client/WxClient";
 import {config} from "@prisma/client";
+import {WxClient} from "../client/WxClient";
 
 
 export default class PrismaService extends Singleton<PrismaService> {
 
     public prisma: PrismaClient;
+    private readonly wxClient: WxClient = WxClient.getInstance();
 
     constructor() {
         super();
@@ -38,16 +39,15 @@ export default class PrismaService extends Singleton<PrismaService> {
     }
 
     public async getConfigCurrentLoginWxAndToken(): Promise<config> {
-        const wxClient = WxClient.getInstance()
         return new Promise((resolve, reject) => {
-            if (!wxClient.hasLogin) {
+            if (!this.wxClient.hasLogin) {
                 reject('微信没登录')
             } else {
                 this.prisma.config.findUniqueOrThrow({
                     where: {
                         bot_token_login_wxid: {
                             bot_token: ConfigEnv.BOT_TOKEN,
-                            login_wxid: wxClient.me?.wxid
+                            login_wxid: this.wxClient.me?.wxid
                         }
                     }
                 }).then((config) => {

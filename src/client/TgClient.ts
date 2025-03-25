@@ -20,8 +20,8 @@ import {revoke} from "../util/GewePostUtils";
 
 
 export default class TgClient extends AbstractClient<TelegramClient> {
-    public static DEFAULT_FILTER_ID: number = 116
-    public static DIALOG_TITLE: string = 'WeChat'
+    public static readonly DEFAULT_FILTER_ID: number = 116
+    public static readonly DIALOG_TITLE: string = 'WeChat'
     private readonly prismaService = PrismaService.getInstance(PrismaService)
     public waitingReplyOnLogin = []
 
