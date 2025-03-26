@@ -11,15 +11,15 @@ import {WxClient} from "../client/WxClient";
 export class MessageService extends Singleton<MessageService> {
     public static readonly snowflake = new Snowflake();
 
-    private messageQueue: SendingMessage[] = [];
+    private readonly messageQueue: SendingMessage[] = [];
 
-    private clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
+    private readonly clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
 
-    private loopTime = 829
+    private readonly loopTime = 829
 
-    private maxRetries = 3;
+    private readonly maxRetries = 3;
 
-    private prismaService = PrismaService.getInstance(PrismaService)
+    private readonly prismaService = PrismaService.getInstance(PrismaService)
 
     constructor() {
         super();

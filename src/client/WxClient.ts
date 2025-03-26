@@ -19,7 +19,6 @@ import {quote} from "../util/GewePostUtils";
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number[] = []
-    private messageSet: Set<string> = new Set();
     private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
     private readonly prismaService = PrismaService.getInstance(PrismaService)
 
@@ -248,15 +247,6 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.checkOnline()
     }
 
-    private isDuplicateMessage(msgId: string): boolean {
-        if (this.messageSet.has(msgId)) {
-            return true;
-        }
-        this.messageSet.add(msgId);
-        setTimeout(() => this.messageSet.delete(msgId), 60000);
-        return false;
-    }
-
     onMessage(any: any): void {
         this.bot.on('scan', qrcode => {
             if (qrcode) {
@@ -280,7 +270,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         this.bot.on('message', async (msg) => {
 
-                if (this.isDuplicateMessage(msg._newMsgId)) {
+                if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId)) {
                     return
                 }
                 // 只处理登录之后的消息 且不是发送给文件助手的消息
@@ -295,9 +285,9 @@ export class WxClient extends AbstractClient<GeweBot> {
         this.bot.on('room-invite', async (roomInvitation) => {
 
         })
-        this.bot.on('friendship', (friendship) => {
+        this.bot.on('friendship', async (friendship) => {
             // @ts-ignore
-            if (this.isDuplicateMessage(friendship.fromId)) {
+            if (await this.wxMessageHelper.isDuplicateMessage(friendship.fromId)) {
                 return
             }
 
@@ -328,9 +318,8 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {
-            // this.logDebug('wx revoke', msg)
-            // 这个也有问题会被触发两次
-            if (this.isDuplicateMessage(msg._newMsgId)) {
+
+            if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId)) {
                 return
             }
             const existMsg = await this.prismaService.prisma.wx_msg_filter.findUnique({

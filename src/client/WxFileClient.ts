@@ -14,8 +14,8 @@ import {TgMessageUtils} from "../util/TgMessageUtils";
 
 export class WxFileClient extends AbstractClient<Wechaty> {
     private scanMsgId: number | undefined;
-    private prismaService = PrismaService.getInstance(PrismaService)
-    private tgClient = TgClient.getInstance();
+    private readonly prismaService = PrismaService.getInstance(PrismaService)
+    private readonly tgClient = TgClient.getInstance();
 
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {

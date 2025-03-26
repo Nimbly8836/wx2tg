@@ -20,10 +20,10 @@ import {MessageType} from "../entity/Message";
 
 export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
-    private prismaService = PrismaService.getInstance(PrismaService);
-    private messageService = MessageService.getInstance(MessageService);
-    private tgUserClient = TgClient.getInstance()
-    private tgBotClient = BotClient.getInstance()
+    private readonly prismaService = PrismaService.getInstance(PrismaService);
+    private readonly messageService = MessageService.getInstance(MessageService);
+    private readonly tgUserClient = TgClient.getInstance()
+    private readonly tgBotClient = BotClient.getInstance()
 
     constructor() {
         super();
@@ -499,6 +499,23 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
 
                 }
 
+            })
+        })
+    }
+
+    public async isDuplicateMessage(msgId: string): Promise<boolean> {
+        return new Promise(resolve => {
+            this.prismaService.prisma.wx_msg_filter.findUnique({
+                where: {id: msgId},
+            }).then((res) => {
+                if (!res) {
+                    this.prismaService.prisma.wx_msg_filter.create({
+                        data: {id: msgId},
+                    }).then()
+                    return resolve(false);
+                } else {
+                    return resolve(true);
+                }
             })
         })
     }
