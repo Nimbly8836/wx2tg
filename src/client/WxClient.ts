@@ -19,7 +19,6 @@ import {quote} from "../util/GewePostUtils";
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number[] = []
-    private messageSet: Set<string> = new Set();
     private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
     private readonly prismaService = PrismaService.getInstance(PrismaService)
 

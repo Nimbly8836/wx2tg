@@ -26,11 +26,11 @@ import {ConverterHelper} from "../util/FfmpegUtils";
 
 export default class BotHelper extends Singleton<BotHelper> {
 
-    private prismaService = PrismaService.getInstance(PrismaService);
-    private wxClient = WxClient.getInstance();
-    private wxFileClient = WxFileClient.getInstance();
-    private tgClient = TgClient.getInstance();
-    private messageService = MessageService.getInstance(MessageService);
+    private readonly prismaService = PrismaService.getInstance(PrismaService);
+    private readonly wxClient = WxClient.getInstance();
+    private readonly wxFileClient = WxFileClient.getInstance();
+    private readonly tgClient = TgClient.getInstance();
+    private readonly messageService = MessageService.getInstance(MessageService);
 
     constructor() {
         super();
