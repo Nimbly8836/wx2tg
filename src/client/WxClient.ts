@@ -287,7 +287,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         this.bot.on('room-invite', async (roomInvitation) => {
 
         })
-        this.bot.on('friendship', (friendship) => {
+        this.bot.on('friendship', async (friendship) => {
 
             // @ts-ignore
             if (await this.wxMessageHelper.isDuplicateMessage(friendship.fromId + '')) {
