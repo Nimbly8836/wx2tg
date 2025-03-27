@@ -25,6 +25,8 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
     private readonly tgUserClient = TgClient.getInstance()
     private readonly tgBotClient = BotClient.getInstance()
 
+    private readonly messageFilterSet = new Set<string>();
+
     constructor() {
         super();
     }
@@ -511,8 +513,9 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
                 if (!res) {
                     this.prismaService.prisma.wx_msg_filter.create({
                         data: {id: msgId},
-                    }).then()
-                    return resolve(false);
+                    }).then(() => {
+                        return resolve(false);
+                    })
                 } else {
                     return resolve(true);
                 }
