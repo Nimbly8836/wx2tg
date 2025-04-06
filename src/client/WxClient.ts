@@ -248,11 +248,25 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.checkOnline()
     }
 
-    private isDuplicateMessage(msgId: string): boolean {
-        if (this.messageSet.has(msgId)) {
+    private async isDuplicateMessage(msgId: string): Promise<boolean> {
+        const message = await this.prismaService.prisma.message.findFirst({
+            where: {id: Number(msgId)},
+        });
+        if (this.messageSet.has(msgId) || message) {
             return true;
         }
         this.messageSet.add(msgId);
+        this.prismaService.prisma.wx_msg_filter.upsert({
+            where: {
+                id: msgId
+            },
+            update: {
+                id: msgId
+            },
+            create: {
+                id: msgId
+            }
+        }).then()
         setTimeout(() => this.messageSet.delete(msgId), 60000);
         return false;
     }
