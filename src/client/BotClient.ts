@@ -7,12 +7,18 @@ import PrismaService from "../service/PrismaService";
 import {defaultSetting} from "../util/SettingUtils";
 import {autoInjectable, container, singleton} from "tsyringe";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
+import {WxClient} from "./WxClient";
+import TgClient from "./TgClient";
 
 @autoInjectable()
 @singleton()
 export default class BotClient extends AbstractClient<Telegraf> {
 
-    constructor(readonly prismaService: PrismaService,) {
+    constructor(
+        readonly prismaService: PrismaService,
+        private readonly wxClient: WxClient,
+        private readonly tgClient: TgClient,
+    ) {
         super();
         this.bot = new Telegraf(ConfigEnv.BOT_TOKEN)
         this.bot.use(session({defaultSession: () => ({})}))
@@ -20,9 +26,9 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     public async start() {
         return new Promise((resolve, reject) => {
-            getClientByEnum(ClientEnum.TG_BOT).login().then(() => {
-                getClientByEnum(ClientEnum.TG_USER).login().then(() => {
-                    getClientByEnum(ClientEnum.WX_BOT).login().then(() => {
+            this.login().then(() => {
+                this.tgClient.login().then(() => {
+                    this.wxClient.login().then(() => {
                         resolve(true);
                     }).catch(reject);
                 }).catch(reject);

@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import {LogUtils} from "./util/LogUtils";
 import {ClientEnum, getClientByEnum} from "./constant/ClientConstants";
 import BotClient from "./client/BotClient";
@@ -25,8 +26,8 @@ const originalExit = process.exit;
 
 // process.exit = (code) => {
 //     if (code === 1) {
-//         let clientByEnum = getClientByEnum(ClientEnum.WX_BOT) as WxClient;
-//         clientByEnum.check().then(check => {
+//         const wxClient = container.resolve(WxClient);
+//         wxClient.check().then(check => {
 //             if (!check) {
 //                 botClient.sendMessage({
 //                     msgType: 'text',

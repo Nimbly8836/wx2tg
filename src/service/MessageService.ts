@@ -5,6 +5,7 @@ import IClient from "../base/IClient";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
+import BotClient from "../client/BotClient";
 import {autoInjectable, singleton} from "tsyringe";
 import {AbstractService} from "../base/IService";
 
@@ -21,9 +22,18 @@ export class MessageService extends AbstractService {
 
     private readonly maxRetries = 3;
 
-    constructor(readonly prismaService: PrismaService) {
+    constructor(
+        readonly prismaService: PrismaService,
+        private readonly botClient: BotClient,
+        private readonly wxClient: WxClient,
+        private readonly tgClient: TgClient
+    ) {
         super();
-        this.startSend()
+        // 初始化 clients Map
+        this.clients.set(ClientEnum.TG_BOT, this.botClient);
+        this.clients.set(ClientEnum.WX_BOT, this.wxClient);
+        this.clients.set(ClientEnum.TG_USER, this.tgClient);
+        this.startSend();
     }
 
     public addMessages(sendMessage: SendMessage, usingClient: ClientEnum) {
@@ -48,9 +58,7 @@ export class MessageService extends AbstractService {
             }
         }
         this.messageQueue.splice(left, 0, sendingMessage)
-        if (!this.clients.get(usingClient)) {
-            this.clients.set(usingClient, getClientByEnum(usingClient));
-        }
+        // 不再需要动态获取客户端，因为已经在构造函数中初始化
     }
 
     private processQueue() {

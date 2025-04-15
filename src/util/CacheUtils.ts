@@ -1,9 +1,10 @@
 import PrismaService from "../service/PrismaService";
+import {container} from "tsyringe";
 
 export const groupIds = new Set<number>()
 
 export function initGroupIds() {
-    PrismaService.getInstance(PrismaService).prisma.group.findMany({
+    container.resolve(PrismaService).prisma.group.findMany({
         where: {
             forward: true
         }
