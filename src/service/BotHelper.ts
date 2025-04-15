@@ -1,8 +1,7 @@
 import {Markup, Telegraf} from "telegraf";
-import {Singleton} from "../base/IService";
+import {AbstractService} from "../base/IService";
 import {MessageService} from "./MessageService";
 import {ClientEnum} from "../constant/ClientConstants";
-import {SimpleClientFactory} from "../base/Factory";
 import PrismaService from "./PrismaService";
 import {ConfigEnv} from "../config/Config";
 import TgClient from "../client/TgClient";
@@ -23,16 +22,18 @@ import {Api} from "telegram/tl";
 import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
 import FileUtils from "../util/FileUtils";
 import {ConverterHelper} from "../util/FfmpegUtils";
+import {autoInjectable, singleton} from "tsyringe";
 
-export default class BotHelper extends Singleton<BotHelper> {
+@autoInjectable()
+@singleton()
+export default class BotHelper extends AbstractService {
 
-    private prismaService = PrismaService.getInstance(PrismaService);
-    private wxClient = WxClient.getInstance();
-    private wxFileClient = WxFileClient.getInstance();
-    private tgClient = TgClient.getInstance();
-    private messageService = MessageService.getInstance(MessageService);
-
-    constructor() {
+    constructor(private readonly prismaService: PrismaService,
+                private readonly wxClient: WxClient,
+                private readonly wxFileClient: WxFileClient,
+                private readonly tgClient: TgClient,
+                private readonly messageService: MessageService,
+    ) {
         super();
     }
 
@@ -133,7 +134,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                                 bot_id: bot.botInfo.id,
                             },
                         }).then(() => {
-                            TgClient.getInstance().login().then(r => {
+                            this.tgClient.login().then(r => {
                                 if (r) {
                                     ctx.reply('Tg 登录成功')
                                 }
@@ -153,7 +154,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                             }).then()
                         }
                         if (!r?.tg_login) {
-                            TgClient.getInstance().login().then(r => {
+                            this.tgClient.login().then(r => {
                                 if (r) {
                                     ctx.reply('Tg 登录成功')
                                 }
@@ -164,8 +165,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
         })
 
         bot.command('login', (ctx) => {
-            let WxClient = SimpleClientFactory.getSingletonClient(ClientEnum.WX_BOT) as WxClient;
-            WxClient.login().then(r => {
+            this.wxClient.login().then(r => {
                 ctx.reply(r ? '登录成功' : '登录失败')
             }).catch(err => {
                 ctx.reply('登录失败：', err)

@@ -10,12 +10,13 @@ import * as fs from "node:fs";
 import {Constants} from "../constant/Constants";
 import TgClient from "./TgClient";
 import {TgMessageUtils} from "../util/TgMessageUtils";
+import {autoInjectable, singleton} from "tsyringe";
 
 
+@autoInjectable()
+@singleton()
 export class WxFileClient extends AbstractClient<Wechaty> {
     private scanMsgId: number | undefined;
-    private prismaService = PrismaService.getInstance(PrismaService)
-    private tgClient = TgClient.getInstance();
 
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
@@ -171,7 +172,8 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         })
     }
 
-    private constructor() {
+    constructor(readonly prismaService: PrismaService,
+                readonly tgClient: TgClient) {
         super();
         // 无法从文件缓存中恢复
         this.bot = WechatyBuilder.build({
@@ -183,13 +185,6 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         });
     }
 
-    static getInstance(): WxFileClient {
-        if (this.instance == null) {
-            this.instance = new WxFileClient();
-            (this.instance as WxFileClient).initialize();
-        }
-        return this.instance as WxFileClient;
-    }
 
     private initialize(): void {
         this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));

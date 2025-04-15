@@ -4,10 +4,8 @@ import os from "node:os";
 import {TelegramClient} from 'telegram/client/TelegramClient'
 import {StoreSession} from "telegram/sessions";
 import {ConfigEnv} from "../config/Config";
-import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import BotClient from "./BotClient";
 import PrismaService from "../service/PrismaService";
-import {Telegraf} from "telegraf";
 import {message} from "telegraf/filters";
 import {Api} from "telegram";
 import {NewMessage} from "telegram/events";
@@ -17,16 +15,19 @@ import QRCode from "qrcode";
 import {Constants} from "../constant/Constants";
 import {DeletedMessage, DeletedMessageEvent} from "telegram/events/DeletedMessage";
 import {revoke} from "../util/GewePostUtils";
+import {autoInjectable, container, singleton} from "tsyringe";
+import {ClientEnum} from "../constant/ClientConstants";
 
 
+@autoInjectable()
+@singleton()
 export default class TgClient extends AbstractClient<TelegramClient> {
-    public static DEFAULT_FILTER_ID: number = 116
-    public static DIALOG_TITLE: string = 'WeChat'
-    private readonly prismaService = PrismaService.getInstance(PrismaService)
+    public static readonly DEFAULT_FILTER_ID: number = 116
+    public static readonly DIALOG_TITLE: string = 'WeChat'
     public waitingReplyOnLogin = []
 
 
-    private constructor() {
+    constructor(readonly prismaService: PrismaService, readonly botClient: BotClient) {
         super();
         this.bot = new TelegramClient(new StoreSession('storage/tg-user-session'),
             ConfigEnv.API_ID,
@@ -44,16 +45,19 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             })
     }
 
-    static getInstance(): TgClient {
-        if (this.instance == null) {
-            this.instance = new TgClient();
-            (this.instance as TgClient).initialize()
-        }
-        return this.instance as TgClient;
-    }
+    // private initialize(): void {
+    //     this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
+    //
+    //     if (this.hasLogin) {
+    //         this.setupFolder()
+    //     }
+    //
+    //     // 设置需要监听的群组id
+    //     initGroupIds()
+    //
+    // }
 
-    private initialize(): void {
-        this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
+    async login(): Promise<boolean> {
 
         if (this.hasLogin) {
             this.setupFolder()
@@ -62,12 +66,8 @@ export default class TgClient extends AbstractClient<TelegramClient> {
         // 设置需要监听的群组id
         initGroupIds()
 
-    }
-
-    async login(): Promise<boolean> {
-        const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
-        const tgBot = botClient.bot as Telegraf;
-        const prisma = PrismaService.getInstance(PrismaService)
+        const tgBot = this.botClient.bot;
+        const prisma = this.prismaService
         return new Promise((resolve, reject) => {
             this.bot.connect().then(async () => {
                 const b = await this.bot.checkAuthorization();
@@ -183,7 +183,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
 
             if (!wxDialog) {
                 const dialogId = Math.max(...dialogFilterIdList) + 1 || TgClient.DEFAULT_FILTER_ID
-                const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
+                const botClient = this.botClient
                 this.bot?.getInputEntity(botClient.bot.botInfo.id).then(botEntity => {
                     const dialogFilter = new Api.DialogFilter({
                         id: dialogId,
@@ -209,7 +209,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
     }
 
     private setEvenHandler() {
-        const messageService = MessageService.getInstance(MessageService);
+        const messageService = container.resolve(MessageService);
 
         if (this.bot.connected) {
             // 监听所有接收的消息

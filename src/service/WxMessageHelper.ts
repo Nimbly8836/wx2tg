@@ -1,4 +1,4 @@
-import {Singleton} from "../base/IService";
+import {AbstractService} from "../base/IService";
 import {Contact, Filebox, Message} from "gewechaty";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
@@ -17,15 +17,17 @@ import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
 import {MessageType} from "../entity/Message";
+import {autoInjectable, container, singleton} from "tsyringe";
 
-export default class WxMessageHelper extends Singleton<WxMessageHelper> {
+@autoInjectable()
+@singleton()
+export default class WxMessageHelper extends AbstractService {
 
-    private readonly prismaService = PrismaService.getInstance(PrismaService);
-    private readonly messageService = MessageService.getInstance(MessageService);
-    private readonly tgUserClient = TgClient.getInstance()
-    private readonly tgBotClient = BotClient.getInstance()
 
-    constructor() {
+    constructor(readonly prismaService: PrismaService,
+                readonly messageService: MessageService,
+                readonly tgUserClient: TgClient,
+                readonly tgBotClient: BotClient) {
         super();
     }
 
@@ -242,7 +244,7 @@ export default class WxMessageHelper extends Singleton<WxMessageHelper> {
     }
 
     public async sendMessages(msg: Message) {
-        const wxMsgType = WxClient.getInstance().bot.Message.Type;
+        const wxMsgType = container.resolve(WxClient).bot.Message.Type;
 
         if (!msg.type()) {
             // 没有类型的消息不处理，大多是通知或者无法处理的消息

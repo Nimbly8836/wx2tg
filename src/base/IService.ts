@@ -31,20 +31,4 @@ export abstract class AbstractService implements IService {
     }
 }
 
-export abstract class Singleton<T> extends AbstractService {
-    protected static instance: any;
-
-    protected constructor() {
-        super()
-    }
-
-    public static getInstance<T>(that: new () => T): T {
-        if (!this.instance) {
-            this.instance = new that();
-        }
-        return this.instance;
-    }
-
-}
-
 

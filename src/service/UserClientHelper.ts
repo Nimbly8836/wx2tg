@@ -7,6 +7,7 @@ import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {returnBigInt} from "telegram/Helpers";
 import {addToGroupIds} from "../util/CacheUtils";
+import {container} from "tsyringe";
 
 export function createChannel(createGroupParams: {
     isRoom: boolean,
@@ -17,7 +18,7 @@ export function createChannel(createGroupParams: {
     channelId: number,
     title: string
 }, users: Api.TypeEntityLike[], resolve: Function) {
-    const tgUserClient = TgClient.getInstance();
+    const tgUserClient = container.resolve(TgClient)
     const {title} = createGroupParams
     tgUserClient.bot?.invoke(
         new Api.messages.CreateChat({
@@ -75,7 +76,7 @@ export function insertDbUpdateAvatar(createGroupParams: {
 
     const {isRoom, loginWxId, roomId, fromId, configId, channelId, title} = createGroupParams
 
-    const prismaService = PrismaService.getInstance(PrismaService);
+    const prismaService = container.resolve(PrismaService);
     const query = isRoom ?
         prismaService.prisma.wx_room.findUnique({
             where: {
@@ -126,7 +127,7 @@ export function insertDbUpdateAvatar(createGroupParams: {
 }
 
 export async function addToFolder(chatId: number) {
-    const tgUserClient = TgClient.getInstance();
+    const tgUserClient = container.resolve(TgClient)
     tgUserClient.bot?.invoke(new Api.messages.GetDialogFilters()).then(result => {
         const dialogFilter: Api.TypeDialogFilter = result?.filters.find(it => {
             return it instanceof Api.DialogFilter && it.title === TgClient.DIALOG_TITLE
@@ -158,7 +159,7 @@ export async function addToFolder(chatId: number) {
 }
 
 export async function updateGroupHeadImg(imageUrl: string, chatId: number) {
-    const tgUserClient = TgClient.getInstance();
+    const tgUserClient = container.resolve(TgClient)
     if (imageUrl) {
         return FileUtils.downloadBuffer(imageUrl).then(file => {
             tgUserClient.bot.uploadFile({
@@ -189,7 +190,7 @@ export async function updateGroupHeadImg(imageUrl: string, chatId: number) {
 }
 
 export async function updateGroupTitle(title: string, chatId: number) {
-    const tgUserClient = TgClient.getInstance();
+    const tgUserClient = container.resolve(TgClient)
 
     if (chatId.toString().startsWith('-100')) {
         return tgUserClient.bot.invoke(

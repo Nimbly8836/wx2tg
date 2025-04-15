@@ -1,27 +1,27 @@
-import {Singleton} from "../base/IService";
 import {SendingMessage, SendMessage} from "../base/IMessage";
 import {Snowflake} from "nodejs-snowflake";
-import {ClientEnum} from "../constant/ClientConstants";
+import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import IClient from "../base/IClient";
-import {SimpleClientFactory} from "../base/Factory";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
+import {autoInjectable, singleton} from "tsyringe";
+import {AbstractService} from "../base/IService";
 
-export class MessageService extends Singleton<MessageService> {
+@autoInjectable()
+@singleton()
+export class MessageService extends AbstractService {
     public static readonly snowflake = new Snowflake();
 
-    private messageQueue: SendingMessage[] = [];
+    private readonly messageQueue: SendingMessage[] = [];
 
-    private clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
+    private readonly clients: Map<ClientEnum, IClient> = new Map<ClientEnum, IClient>();
 
-    private loopTime = 829
+    private readonly loopTime = 829
 
-    private maxRetries = 3;
+    private readonly maxRetries = 3;
 
-    private prismaService = PrismaService.getInstance(PrismaService)
-
-    constructor() {
+    constructor(readonly prismaService: PrismaService) {
         super();
         this.startSend()
     }
@@ -49,7 +49,7 @@ export class MessageService extends Singleton<MessageService> {
         }
         this.messageQueue.splice(left, 0, sendingMessage)
         if (!this.clients.get(usingClient)) {
-            this.clients.set(usingClient, SimpleClientFactory.getSingletonClient(usingClient))
+            this.clients.set(usingClient, getClientByEnum(usingClient));
         }
     }
 

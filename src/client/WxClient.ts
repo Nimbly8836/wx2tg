@@ -1,7 +1,7 @@
 import {AbstractClient} from "../base/AbstractClient";
 import {Contact, ContactSelf, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
-import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
+import {ClientEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
@@ -14,19 +14,21 @@ import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
 import {quote} from "../util/GewePostUtils";
+import {autoInjectable, singleton} from "tsyringe";
 
 
+@autoInjectable()
+@singleton()
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number[] = []
-    private readonly wxMessageHelper = WxMessageHelper.getInstance(WxMessageHelper);
-    private readonly prismaService = PrismaService.getInstance(PrismaService)
+
 
     public me: ContactSelf
     public friendshipList = []
 
 
-    private constructor() {
+    constructor(readonly wxMessageHelper: WxMessageHelper, readonly prismaService: PrismaService) {
         super();
         this.bot = new GeweBot({
             base_api: ConfigEnv.BASE_API,
@@ -41,19 +43,6 @@ export class WxClient extends AbstractClient<GeweBot> {
     }
 
     private loginTime: number = 0
-
-    static getInstance(): WxClient {
-        if (this.instance == null) {
-            this.instance = new WxClient();
-            (this.instance as WxClient).initialize();
-        }
-        return this.instance as WxClient;
-    }
-
-    private initialize(): void {
-        this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
-    }
-
 
     login(): Promise<boolean> {
         // 发送文件需要的路径 暂时写死, 不改 ge_wechaty
@@ -78,7 +67,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 app.use(router.routes()).use(router.allowedMethods())
 
                 // 更新 config 表 wx_id 插入缓存的 concat 和 room
-                let prismaService = PrismaService.getInstance(PrismaService);
+                let prismaService = this.prismaService
                 const config = prismaService.config()
                 this.bot.info().then(async info => {
                     const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
@@ -256,7 +245,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 }, (error, buffer) => {
                     const tgBot = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
                     if (!error) {
-                        PrismaService.getInstance(PrismaService).getConfigByToken()
+                        this.prismaService.getConfigByToken()
                             .then(findConfig => {
                                 const chatId = findConfig.bot_chat_id
                                 tgBot.bot.telegram.sendPhoto(Number(chatId), {source: buffer},

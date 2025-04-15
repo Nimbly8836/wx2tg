@@ -7,9 +7,8 @@
     "strict": false,
     "outDir": "dist",
     "rootDir": "src",
-    "skipLibCheck": true,
     "noImplicitAny": false,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
   },
 }

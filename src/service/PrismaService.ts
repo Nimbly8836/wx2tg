@@ -1,4 +1,4 @@
-import {Singleton} from "../base/IService";
+import {AbstractService} from "../base/IService";
 import {ConfigEnv} from "../config/Config";
 import {Database} from "sqlite3";
 import {WxConcat, WxRoom} from "../entity/WeChatSqlite";
@@ -7,9 +7,12 @@ import {Constants} from "../constant/Constants";
 import {LogUtils} from "../util/LogUtils";
 import {WxClient} from "../client/WxClient";
 import {config} from "@prisma/client";
+import {autoInjectable, container, singleton} from "tsyringe";
 
 
-export default class PrismaService extends Singleton<PrismaService> {
+@autoInjectable()
+@singleton()
+export default class PrismaService extends AbstractService {
 
     public prisma: PrismaClient;
 
@@ -38,7 +41,7 @@ export default class PrismaService extends Singleton<PrismaService> {
     }
 
     public async getConfigCurrentLoginWxAndToken(): Promise<config> {
-        const wxClient = WxClient.getInstance()
+        const wxClient = container.resolve(WxClient);
         return new Promise((resolve, reject) => {
             if (!wxClient.hasLogin) {
                 reject('微信没登录')

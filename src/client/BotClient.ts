@@ -3,38 +3,26 @@ import {Context, session, Telegraf} from "telegraf";
 import {ConfigEnv} from "../config/Config";
 import BotHelper from "../service/BotHelper";
 import {SendMessage} from "../base/IMessage";
-import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import PrismaService from "../service/PrismaService";
-import TgClient from "./TgClient";
-import {WxClient} from "./WxClient";
 import {defaultSetting} from "../util/SettingUtils";
+import {autoInjectable, container, singleton} from "tsyringe";
+import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 
+@autoInjectable()
+@singleton()
 export default class BotClient extends AbstractClient<Telegraf> {
 
-    private constructor() {
+    constructor(readonly prismaService: PrismaService,) {
         super();
         this.bot = new Telegraf(ConfigEnv.BOT_TOKEN)
         this.bot.use(session({defaultSession: () => ({})}))
     }
 
-    static getInstance(): BotClient {
-        if (this.instance == null) {
-            this.instance = new BotClient();
-            (this.instance as BotClient).initialize()
-        }
-        return this.instance as BotClient;
-    }
-
-    private initialize(): void {
-        this.spyClients.set(ClientEnum.WX_BOT, getClientByEnum(ClientEnum.WX_BOT));
-
-    }
-
     public async start() {
         return new Promise((resolve, reject) => {
-            this.login().then(() => {
-                TgClient.getInstance().login().then(() => {
-                    WxClient.getInstance().login().then(() => {
+            getClientByEnum(ClientEnum.TG_BOT).login().then(() => {
+                getClientByEnum(ClientEnum.TG_USER).login().then(() => {
+                    getClientByEnum(ClientEnum.WX_BOT).login().then(() => {
                         resolve(true);
                     }).catch(reject);
                 }).catch(reject);
@@ -48,7 +36,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
             this.bot.launch(() => {
                 this.hasLogin = true
 
-                const prismaService = PrismaService.getInstance(PrismaService);
+                const prismaService = this.prismaService;
                 prismaService.getConfigByToken().then(config => {
                     if (config) {
                         if (!config?.tg_login) {
@@ -93,9 +81,8 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     async sendMessage(msg: SendMessage): Promise<Record<string, any>> {
         // 默认发送到 bot_chat_id
-        const prismaService = PrismaService.getInstance(PrismaService);
         if (!msg.chatId) {
-            msg.chatId = Number((await prismaService.getConfigByToken()).bot_chat_id)
+            msg.chatId = Number((await this.prismaService.getConfigByToken()).bot_chat_id)
         }
         return new Promise<object>((resolve, reject) => {
             let result = null
@@ -173,7 +160,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     private initBot(): void {
         // 设置命令
-        const botHelper = BotHelper.getInstance(BotHelper);
+        const botHelper = container.resolve(BotHelper)
         botHelper.filterOwner(this.bot)
         botHelper.setCommands(this.bot)
         botHelper.onCommand(this.bot)
