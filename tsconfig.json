@@ -4,11 +4,12 @@
     "module": "CommonJS",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
     "strict": false,
     "outDir": "dist",
     "rootDir": "src",
     "noImplicitAny": false,
     "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
+    "experimentalDecorators": true
   },
 }
