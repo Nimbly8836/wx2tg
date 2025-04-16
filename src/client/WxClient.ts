@@ -14,7 +14,7 @@ import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
 import {quote} from "../util/GewePostUtils";
-import {autoInjectable, singleton} from "tsyringe";
+import {autoInjectable, singleton, delay, inject} from "tsyringe";
 
 
 @autoInjectable()
@@ -28,7 +28,8 @@ export class WxClient extends AbstractClient<GeweBot> {
     public friendshipList = []
 
 
-    constructor(readonly wxMessageHelper: WxMessageHelper, readonly prismaService: PrismaService) {
+    constructor(@inject(delay(() => WxMessageHelper)) readonly wxMessageHelper: WxMessageHelper,
+                readonly prismaService: PrismaService) {
         super();
         this.bot = new GeweBot({
             base_api: ConfigEnv.BASE_API,

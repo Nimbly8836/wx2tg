@@ -22,17 +22,17 @@ import {Api} from "telegram/tl";
 import {addToGroupIds, removeFromGroupIds} from "../util/CacheUtils";
 import FileUtils from "../util/FileUtils";
 import {ConverterHelper} from "../util/FfmpegUtils";
-import {autoInjectable, singleton} from "tsyringe";
+import {autoInjectable, delay, inject, singleton} from "tsyringe";
 
 @autoInjectable()
 @singleton()
 export default class BotHelper extends AbstractService {
 
     constructor(private readonly prismaService: PrismaService,
-                private readonly wxClient: WxClient,
-                private readonly wxFileClient: WxFileClient,
-                private readonly tgClient: TgClient,
-                private readonly messageService: MessageService,
+                @inject(delay(() => WxClient)) private readonly wxClient: WxClient,
+                @inject(delay(() => WxFileClient)) private readonly wxFileClient: WxFileClient,
+                @inject(delay(() => TgClient)) private readonly tgClient: TgClient,
+                @inject(delay(() => MessageService)) private readonly messageService: MessageService,
     ) {
         super();
     }

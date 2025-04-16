@@ -17,7 +17,7 @@ import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
 import {MessageType} from "../entity/Message";
-import {autoInjectable, container, singleton} from "tsyringe";
+import {autoInjectable, container, singleton, inject, delay} from "tsyringe";
 
 @autoInjectable()
 @singleton()
@@ -25,7 +25,7 @@ export default class WxMessageHelper extends AbstractService {
 
 
     constructor(readonly prismaService: PrismaService,
-                readonly messageService: MessageService,
+                @inject(delay(() => MessageService)) readonly messageService: MessageService,
                 readonly tgUserClient: TgClient,
                 readonly tgBotClient: BotClient) {
         super();

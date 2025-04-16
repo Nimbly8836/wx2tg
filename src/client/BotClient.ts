@@ -5,19 +5,19 @@ import BotHelper from "../service/BotHelper";
 import {SendMessage} from "../base/IMessage";
 import PrismaService from "../service/PrismaService";
 import {defaultSetting} from "../util/SettingUtils";
-import {autoInjectable, container, singleton} from "tsyringe";
+import {injectable, container, inject, singleton, delay} from "tsyringe";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import {WxClient} from "./WxClient";
 import TgClient from "./TgClient";
 
-@autoInjectable()
+@injectable()
 @singleton()
 export default class BotClient extends AbstractClient<Telegraf> {
 
     constructor(
-        readonly prismaService: PrismaService,
-        private readonly wxClient: WxClient,
-        private readonly tgClient: TgClient,
+        @inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
+        @inject(delay(() => WxClient)) private readonly wxClient: WxClient,
+        @inject(delay(() => TgClient)) private readonly tgClient: TgClient,
     ) {
         super();
         this.bot = new Telegraf(ConfigEnv.BOT_TOKEN)
