@@ -1,7 +1,6 @@
 import {AbstractClient} from "../base/AbstractClient";
 import {Contact, ContactSelf, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
-import {ClientEnum} from "../constant/ClientConstants";
 import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
 import BotClient from "./BotClient";
@@ -26,6 +25,7 @@ export class WxClient extends AbstractClient<GeweBot> {
 
     public me: ContactSelf
     public friendshipList = []
+    private readonly messageSet: Set<string> = new Set();
 
 
     constructor(@inject(delay(() => WxMessageHelper)) readonly wxMessageHelper: WxMessageHelper,
@@ -240,6 +240,34 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.checkOnline()
     }
 
+    private async isDuplicateMessage(msgId: string): Promise<boolean> {
+        if (this.messageSet.has(msgId)) {
+            return true;
+        }
+
+        return this.prismaService.prisma.wx_msg_filter.findUnique({
+            where: {id: msgId},
+        }).then(res => {
+            if (res) {
+                return true;
+            }
+
+            this.messageSet.add(msgId);
+
+            // Add to database
+            return this.prismaService.prisma.wx_msg_filter.create({
+                data: {id: msgId},
+            }).then(() => {
+                // Remove from memory cache after one minute
+                setTimeout(() => this.messageSet.delete(msgId), 60000);
+                return false;
+            }).catch(e => {
+                this.logError('Duplicate message error: %s', e);
+                return false;
+            });
+        });
+    }
+
     onMessage(any: any): void {
         this.bot.on('scan', qrcode => {
             if (qrcode) {
@@ -263,7 +291,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         this.bot.on('message', async (msg) => {
 
-                if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId + '')) {
+                if (await this.isDuplicateMessage(msg._newMsgId + '')) {
                     return
                 }
 
@@ -282,7 +310,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         this.bot.on('friendship', async (friendship) => {
 
             // @ts-ignore
-            if (await this.wxMessageHelper.isDuplicateMessage(friendship.fromId + '')) {
+            if (await this.isDuplicateMessage(friendship.fromId + '')) {
                 return
             }
 
@@ -313,7 +341,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {
-            if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId)) {
+            if (await this.isDuplicateMessage(msg._newMsgId + '')) {
                 return
             }
             parseSysMsgPayload(msg.text()).then(sysMsgPayload => {

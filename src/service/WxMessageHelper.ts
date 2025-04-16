@@ -518,6 +518,9 @@ export default class WxMessageHelper extends AbstractService {
                 } else {
                     return resolve(true);
                 }
+            }).catch(e => {
+                this.logError("isDuplicateMessage error: ", e)
+                return resolve(false);
             })
         })
     }
