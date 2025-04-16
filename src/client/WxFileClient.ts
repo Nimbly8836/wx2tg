@@ -21,8 +21,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     login(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
             this.bot.start().then(async () => {
-                // 测试是否在线
-                // this.bot.say(this.bot.Contact.find())
+                this.onMessage(null)
                 try {
                     if (!this.bot.isLoggedIn) {
                         if (fs.existsSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)) {
@@ -45,7 +44,8 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                     if (fs.existsSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)) {
                         fs.unlinkSync(`${Constants.WX_FILE_CLIENT}.memory-card.json`)
                     }
-                    reject(e)
+                    this.logError(e)
+                    reject(new Error("微信文件助手登录失败"))
                 }
             })
         })
@@ -60,7 +60,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     }
 
     onMessage(any: any): void {
-        const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
+        const botClient = this.botClient
         this.bot.on('scan', (qrcode, status) => {
             if (status === ScanStatus.Waiting || status === ScanStatus.Timeout) {
                 this.hasLogin = false
@@ -173,7 +173,9 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     }
 
     constructor(readonly prismaService: PrismaService,
-                @inject(delay(() => TgClient)) readonly tgClient: TgClient) {
+                @inject(delay(() => TgClient)) readonly tgClient: TgClient,
+                @inject(delay(() => BotClient)) readonly botClient: BotClient,
+    ) {
         super();
         // 无法从文件缓存中恢复
         this.bot = WechatyBuilder.build({
@@ -183,12 +185,6 @@ export class WxFileClient extends AbstractClient<Wechaty> {
                 timeoutSeconds: 60 * 3,
             },
         });
-    }
-
-
-    private initialize(): void {
-        this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
-        this.onMessage(null);
     }
 
 

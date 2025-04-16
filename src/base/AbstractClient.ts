@@ -9,9 +9,6 @@ export abstract class AbstractClient<T> implements IClient, IService {
     logger: Logger;
     bot: T;
 
-    protected spyClients: Map<ClientEnum, AbstractClient<any>> = new Map<ClientEnum, AbstractClient<any>>();
-    protected static instance: AbstractClient<any> | null = null;
-
     ready: boolean = false;
     hasLogin: boolean = false;
 

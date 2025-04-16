@@ -68,7 +68,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
             }).catch((e) => {
                 this.hasLogin = false
-                reject(e)
+                reject(new Error("Telegram Bot 登录失败"))
             })
         })
     }

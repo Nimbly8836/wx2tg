@@ -14,7 +14,7 @@ import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
 import {quote} from "../util/GewePostUtils";
-import {autoInjectable, singleton, delay, inject} from "tsyringe";
+import {autoInjectable, delay, inject, singleton} from "tsyringe";
 
 
 @autoInjectable()
@@ -29,7 +29,9 @@ export class WxClient extends AbstractClient<GeweBot> {
 
 
     constructor(@inject(delay(() => WxMessageHelper)) readonly wxMessageHelper: WxMessageHelper,
-                readonly prismaService: PrismaService) {
+                readonly prismaService: PrismaService,
+                @inject(delay(() => BotClient)) readonly botClient: BotClient,
+    ) {
         super();
         this.bot = new GeweBot({
             base_api: ConfigEnv.BASE_API,
@@ -71,7 +73,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 let prismaService = this.prismaService
                 const config = prismaService.config()
                 this.bot.info().then(async info => {
-                    const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+                    const botClient = this.botClient
                     if (info?.wxid) {
                         this.me = info
                         prismaService.prisma.config.findFirstOrThrow({
@@ -228,7 +230,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                         this.logError('WxClient find group error: %s', e)
                     })
                 }).catch(e => {
-                reject(e)
+                reject(new Error(e))
             })
 
         })
@@ -244,7 +246,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 QRCode.toBuffer(qrcode.content, {
                     width: 150
                 }, (error, buffer) => {
-                    const tgBot = this.spyClients.get(ClientEnum.TG_BOT) as BotClient;
+                    const tgBot = this.botClient
                     if (!error) {
                         this.prismaService.getConfigByToken()
                             .then(findConfig => {
@@ -285,7 +287,7 @@ export class WxClient extends AbstractClient<GeweBot> {
             }
 
             this.friendshipList.push(friendship)
-            const tgBotClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+            const tgBotClient = this.botClient
             tgBotClient.sendMessage({
                 msgType: 'text',
                 // @ts-ignore
@@ -315,7 +317,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                 return
             }
             parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
-                const botClient = this.spyClients.get(ClientEnum.TG_BOT) as BotClient
+                const botClient = this.botClient
                 this.prismaService.prisma.message.findFirstOrThrow({
                     where: {
                         wx_msg_id: sysMsgPayload.revokemsg?.newmsgid

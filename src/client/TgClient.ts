@@ -47,18 +47,6 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             })
     }
 
-    // private initialize(): void {
-    //     this.spyClients.set(ClientEnum.TG_BOT, getClientByEnum(ClientEnum.TG_BOT));
-    //
-    //     if (this.hasLogin) {
-    //         this.setupFolder()
-    //     }
-    //
-    //     // 设置需要监听的群组id
-    //     initGroupIds()
-    //
-    // }
-
     async login(): Promise<boolean> {
 
         if (this.hasLogin) {
