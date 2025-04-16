@@ -26,8 +26,8 @@ export default class WxMessageHelper extends AbstractService {
 
     constructor(readonly prismaService: PrismaService,
                 @inject(delay(() => MessageService)) readonly messageService: MessageService,
-                readonly tgUserClient: TgClient,
-                readonly tgBotClient: BotClient) {
+                @inject(delay(() => TgClient)) readonly tgUserClient: TgClient,
+                @inject(delay(() => BotClient)) readonly tgBotClient: BotClient) {
         super();
     }
 

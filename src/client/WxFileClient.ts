@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import {Constants} from "../constant/Constants";
 import TgClient from "./TgClient";
 import {TgMessageUtils} from "../util/TgMessageUtils";
-import {autoInjectable, singleton} from "tsyringe";
+import {autoInjectable, delay, inject, singleton} from "tsyringe";
 
 
 @autoInjectable()
@@ -173,7 +173,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
     }
 
     constructor(readonly prismaService: PrismaService,
-                readonly tgClient: TgClient) {
+                @inject(delay(() => TgClient)) readonly tgClient: TgClient) {
         super();
         // 无法从文件缓存中恢复
         this.bot = WechatyBuilder.build({

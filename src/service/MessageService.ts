@@ -6,7 +6,7 @@ import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {WxClient} from "../client/WxClient";
 import BotClient from "../client/BotClient";
-import {autoInjectable, singleton} from "tsyringe";
+import {autoInjectable, delay, inject, singleton} from "tsyringe";
 import {AbstractService} from "../base/IService";
 
 @autoInjectable()
@@ -24,9 +24,9 @@ export class MessageService extends AbstractService {
 
     constructor(
         readonly prismaService: PrismaService,
-        private readonly botClient: BotClient,
-        private readonly wxClient: WxClient,
-        private readonly tgClient: TgClient
+        @inject(delay(() => BotClient))private readonly botClient: BotClient,
+        @inject(delay(() => WxClient)) private readonly wxClient: WxClient,
+        @inject(delay(() => TgClient))private readonly tgClient: TgClient
     ) {
         super();
         // 初始化 clients Map

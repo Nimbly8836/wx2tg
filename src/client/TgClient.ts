@@ -15,7 +15,7 @@ import QRCode from "qrcode";
 import {Constants} from "../constant/Constants";
 import {DeletedMessage, DeletedMessageEvent} from "telegram/events/DeletedMessage";
 import {revoke} from "../util/GewePostUtils";
-import {autoInjectable, container, singleton} from "tsyringe";
+import {autoInjectable, container, delay, inject, singleton} from "tsyringe";
 import {ClientEnum} from "../constant/ClientConstants";
 
 
@@ -27,7 +27,9 @@ export default class TgClient extends AbstractClient<TelegramClient> {
     public waitingReplyOnLogin = []
 
 
-    constructor(readonly prismaService: PrismaService, readonly botClient: BotClient) {
+    constructor(
+        readonly prismaService: PrismaService,
+        @inject(delay(() => BotClient)) readonly botClient: BotClient) {
         super();
         this.bot = new TelegramClient(new StoreSession('storage/tg-user-session'),
             ConfigEnv.API_ID,
