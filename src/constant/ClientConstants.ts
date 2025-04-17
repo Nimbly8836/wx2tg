@@ -1,7 +1,7 @@
 import BotClient from "../client/BotClient";
 import {WxClient} from "../client/WxClient";
 import TgClient from "../client/TgClient";
-import {container} from "tsyringe";
+import { getService } from "../di";
 
 export enum ClientEnum {
     TG_BOT = 'tgBot',
@@ -10,11 +10,11 @@ export enum ClientEnum {
 }
 
 export const ClientProperties = {
-    [ClientEnum.TG_BOT]: {name: 'tgBot', client: BotClient, getClient: () => container.resolve(BotClient)},
-    [ClientEnum.WX_BOT]: {name: 'wx', client: WxClient, getClient: () => container.resolve(WxClient)},
-    [ClientEnum.TG_USER]: {name: 'tgUser', client: TgClient, getClient: () => container.resolve(TgClient)},
+    [ClientEnum.TG_BOT]: {name: 'tgBot', client: BotClient, getClient: () => getService(BotClient)},
+    [ClientEnum.WX_BOT]: {name: 'wx', client: WxClient, getClient: () => getService(WxClient)},
+    [ClientEnum.TG_USER]: {name: 'tgUser', client: TgClient, getClient: () => getService(TgClient)},
 };
 
 export function getClientByEnum(clientEnum: ClientEnum) {
-    return ClientProperties[clientEnum].getClient()
+    return ClientProperties[clientEnum].getClient();
 }

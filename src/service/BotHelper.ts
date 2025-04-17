@@ -24,7 +24,7 @@ import FileUtils from "../util/FileUtils";
 import {ConverterHelper} from "../util/FfmpegUtils";
 import {autoInjectable, delay, inject, singleton} from "tsyringe";
 
-@autoInjectable()
+
 @singleton()
 export default class BotHelper extends AbstractService {
 

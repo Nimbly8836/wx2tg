@@ -7,10 +7,9 @@ import {Constants} from "../constant/Constants";
 import {LogUtils} from "../util/LogUtils";
 import {WxClient} from "../client/WxClient";
 import {config} from "@prisma/client";
-import {autoInjectable, container, singleton} from "tsyringe";
+import {autoInjectable, singleton} from "tsyringe";
+import { getService } from "../di";
 
-
-@autoInjectable()
 @singleton()
 export default class PrismaService extends AbstractService {
 
@@ -41,7 +40,7 @@ export default class PrismaService extends AbstractService {
     }
 
     public async getConfigCurrentLoginWxAndToken(): Promise<config> {
-        const wxClient = container.resolve(WxClient);
+        const wxClient = getService(WxClient);
         return new Promise((resolve, reject) => {
             if (!wxClient.hasLogin) {
                 reject('微信没登录')
@@ -62,7 +61,6 @@ export default class PrismaService extends AbstractService {
             }
         })
     }
-
 
     public async createOrUpdateWxConcatAndRoom(wxid?: string) {
         const currentConfig = await this.getConfigCurrentLoginWxAndToken();

@@ -13,7 +13,7 @@ import {TgMessageUtils} from "../util/TgMessageUtils";
 import {autoInjectable, delay, inject, singleton} from "tsyringe";
 
 
-@autoInjectable()
+
 @singleton()
 export class WxFileClient extends AbstractClient<Wechaty> {
     private scanMsgId: number | undefined;
@@ -172,7 +172,7 @@ export class WxFileClient extends AbstractClient<Wechaty> {
         })
     }
 
-    constructor(readonly prismaService: PrismaService,
+    constructor(@inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
                 @inject(delay(() => TgClient)) readonly tgClient: TgClient,
                 @inject(delay(() => BotClient)) readonly botClient: BotClient,
     ) {

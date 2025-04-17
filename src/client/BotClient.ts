@@ -5,12 +5,12 @@ import BotHelper from "../service/BotHelper";
 import {SendMessage} from "../base/IMessage";
 import PrismaService from "../service/PrismaService";
 import {defaultSetting} from "../util/SettingUtils";
-import {injectable, container, inject, singleton, delay} from "tsyringe";
+import {injectable, inject, singleton, delay} from "tsyringe";
 import {ClientEnum, getClientByEnum} from "../constant/ClientConstants";
 import {WxClient} from "./WxClient";
 import TgClient from "./TgClient";
 
-@injectable()
+
 @singleton()
 export default class BotClient extends AbstractClient<Telegraf> {
 
@@ -18,6 +18,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
         @inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
         @inject(delay(() => WxClient)) private readonly wxClient: WxClient,
         @inject(delay(() => TgClient)) private readonly tgClient: TgClient,
+        @inject(delay(() => BotHelper)) private readonly botHelper: BotHelper,
     ) {
         super();
         this.bot = new Telegraf(ConfigEnv.BOT_TOKEN)
@@ -166,12 +167,11 @@ export default class BotClient extends AbstractClient<Telegraf> {
 
     private initBot(): void {
         // 设置命令
-        const botHelper = container.resolve(BotHelper)
-        botHelper.filterOwner(this.bot)
-        botHelper.setCommands(this.bot)
-        botHelper.onCommand(this.bot)
-        botHelper.onMessage(this.bot)
-        botHelper.onAction(this.bot)
+        this.botHelper.filterOwner(this.bot)
+        this.botHelper.setCommands(this.bot)
+        this.botHelper.onCommand(this.bot)
+        this.botHelper.onMessage(this.bot)
+        this.botHelper.onAction(this.bot)
         this.bot.catch((err, ctx: Context) => {
             this.logError('BotClient catch error : %s', err)
         })

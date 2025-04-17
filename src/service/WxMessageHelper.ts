@@ -17,18 +17,26 @@ import {RoomMemberType} from "../entity/Contact";
 import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
 import {MessageType} from "../entity/Message";
-import {autoInjectable, container, singleton, inject, delay} from "tsyringe";
+import {singleton} from "tsyringe";
+import {WxFileClient} from "../client/WxFileClient";
+import {getService} from "../di";
 
-@autoInjectable()
 @singleton()
-export default class WxMessageHelper extends AbstractService {
+export class WxMessageHelper extends AbstractService {
+    private readonly messageService: MessageService;
+    private readonly tgClient: TgClient;
+    private readonly botClient: BotClient;
+    private readonly wxFileClient: WxFileClient;
+    private readonly prismaService: PrismaService;
+    private readonly messageSet: Set<string> = new Set();
 
-
-    constructor(readonly prismaService: PrismaService,
-                @inject(delay(() => MessageService)) readonly messageService: MessageService,
-                @inject(delay(() => TgClient)) readonly tgUserClient: TgClient,
-                @inject(delay(() => BotClient)) readonly tgBotClient: BotClient) {
+    constructor() {
         super();
+        this.messageService = getService(MessageService);
+        this.tgClient = getService(TgClient);
+        this.botClient = getService(BotClient);
+        this.wxFileClient = getService(WxFileClient);
+        this.prismaService = getService(PrismaService);
     }
 
     public async getTitle(msg: Message): Promise<string> {
@@ -185,11 +193,11 @@ export default class WxMessageHelper extends AbstractService {
                         const doCreateGroup = (existEntity) => {
                             const updatePhoto = (url: string) => FileUtils.downloadBuffer(url)
                                 .then(file => {
-                                    this.tgUserClient.bot.uploadFile({
+                                    this.tgClient.bot.uploadFile({
                                         file: new CustomFile('avatar.jpg', file.length, null, file),
                                         workers: 2,
                                     }).then(photo => {
-                                        this.tgUserClient.bot.invoke(new Api.channels.EditPhoto({
+                                        this.tgClient.bot.invoke(new Api.channels.EditPhoto({
                                             channel: Number(existGroup.tg_group_id),
                                             photo: new Api.InputChatUploadedPhoto({
                                                 file: photo,
@@ -244,7 +252,7 @@ export default class WxMessageHelper extends AbstractService {
     }
 
     public async sendMessages(msg: Message) {
-        const wxMsgType = container.resolve(WxClient).bot.Message.Type;
+        const wxMsgType = getService(WxClient).bot.Message.Type;
 
         if (!msg.type()) {
             // 没有类型的消息不处理，大多是通知或者无法处理的消息
@@ -398,7 +406,7 @@ export default class WxMessageHelper extends AbstractService {
                                     const tgGroupId = Number(existingMessage?.group?.tg_group_id);
                                     if (tgGroupId && fileBox && fileBox.url !== ConfigEnv.FILE_API) {
                                         FileUtils.downloadBuffer(fileBox.url).then(fileBuffer => {
-                                            this.tgBotClient.bot.telegram.editMessageMedia(tgGroupId,
+                                            this.botClient.bot.telegram.editMessageMedia(tgGroupId,
                                                 Number(existingMessage.tg_msg_id),
                                                 null, {
                                                     type: 'photo',
@@ -506,22 +514,29 @@ export default class WxMessageHelper extends AbstractService {
 
 
     public async isDuplicateMessage(msgId: string): Promise<boolean> {
+        // 先检查内存中是否存在
+        if (this.messageSet.has(msgId)) {
+            return true;
+        }
+
+        // 添加到内存中
+        this.messageSet.add(msgId);
+        // 一分钟后从内存中删除
+        setTimeout(() => this.messageSet.delete(msgId), 60000);
+
+        // 如果内存中不存在，检查数据库
         return new Promise(resolve => {
-            this.prismaService.prisma.wx_msg_filter.findUnique({
-                where: {id: msgId},
+            this.prismaService.prisma.wx_msg_filter.upsert({
+                where: { id: msgId },
+                create: { id: msgId },
+                update: {}, // 如果存在就不做任何更新
             }).then((res) => {
-                if (!res) {
-                    this.prismaService.prisma.wx_msg_filter.create({
-                        data: {id: msgId},
-                    }).then()
-                    return resolve(false);
-                } else {
-                    return resolve(true);
-                }
-            }).catch(e => {
-                this.logError("isDuplicateMessage error: ", e)
+                // 如果记录是新创建的，说明不是重复消息
                 return resolve(false);
-            })
-        })
+            }).catch(e => {
+                this.logError("isDuplicateMessage error: ", e);
+                return resolve(false);
+            });
+        });
     }
 }

@@ -19,7 +19,7 @@ import {autoInjectable, container, delay, inject, singleton} from "tsyringe";
 import {ClientEnum} from "../constant/ClientConstants";
 
 
-@autoInjectable()
+
 @singleton()
 export default class TgClient extends AbstractClient<TelegramClient> {
     public static readonly DEFAULT_FILTER_ID: number = 116
@@ -28,7 +28,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
 
 
     constructor(
-        readonly prismaService: PrismaService,
+        @inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
         @inject(delay(() => BotClient)) readonly botClient: BotClient) {
         super();
         this.bot = new TelegramClient(new StoreSession('storage/tg-user-session'),

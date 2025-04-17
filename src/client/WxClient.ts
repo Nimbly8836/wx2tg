@@ -3,8 +3,7 @@ import {Contact, ContactSelf, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
-import BotClient from "./BotClient";
-import WxMessageHelper from "../service/WxMessageHelper";
+import BotClient from "../client/BotClient";
 import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
 import {defaultSetting} from "../util/SettingUtils";
@@ -13,26 +12,28 @@ import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
 import {quote} from "../util/GewePostUtils";
-import {autoInjectable, delay, inject, singleton} from "tsyringe";
+import {inject, delay, singleton} from "tsyringe";
+import {randomUUID} from "node:crypto";
+import {WxMessageHelper} from "../service/WxMessageHelper";
+import {ClientEnum} from "../constant/ClientConstants";
+import {getService} from "../di";
 
-
-@autoInjectable()
 @singleton()
 export class WxClient extends AbstractClient<GeweBot> {
 
     private scanPhotoMsgId: number[] = []
 
+    private readonly cid: string;
 
     public me: ContactSelf
     public friendshipList = []
-    private readonly messageSet: Set<string> = new Set();
 
+    private wxMessageHelper: WxMessageHelper;
 
-    constructor(@inject(delay(() => WxMessageHelper)) readonly wxMessageHelper: WxMessageHelper,
-                readonly prismaService: PrismaService,
-                @inject(delay(() => BotClient)) readonly botClient: BotClient,
-    ) {
+    constructor(@inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
+                @inject(delay(() => BotClient)) readonly botClient: BotClient) {
         super();
+        this.cid = randomUUID().toString()
         this.bot = new GeweBot({
             base_api: ConfigEnv.BASE_API,
             file_api: ConfigEnv.FILE_API,
@@ -43,6 +44,7 @@ export class WxClient extends AbstractClient<GeweBot> {
             cache_path: 'storage/gewe',
             ip: ConfigEnv.GEWE_IP,
         })
+        this.wxMessageHelper = getService(WxMessageHelper);
     }
 
     private loginTime: number = 0
@@ -114,7 +116,7 @@ export class WxClient extends AbstractClient<GeweBot> {
 
                             }
 
-                        })
+                        }).catch((e) => this.logDebug(e))
 
                     }
                     if (this.scanPhotoMsgId?.length > 0) {
@@ -240,34 +242,6 @@ export class WxClient extends AbstractClient<GeweBot> {
         return this.bot.checkOnline()
     }
 
-    private async isDuplicateMessage(msgId: string): Promise<boolean> {
-        if (this.messageSet.has(msgId)) {
-            return true;
-        }
-
-        return this.prismaService.prisma.wx_msg_filter.findUnique({
-            where: {id: msgId},
-        }).then(res => {
-            if (res) {
-                return true;
-            }
-
-            this.messageSet.add(msgId);
-
-            // Add to database
-            return this.prismaService.prisma.wx_msg_filter.create({
-                data: {id: msgId},
-            }).then(() => {
-                // Remove from memory cache after one minute
-                setTimeout(() => this.messageSet.delete(msgId), 60000);
-                return false;
-            }).catch(e => {
-                this.logError('Duplicate message error: %s', e);
-                return false;
-            });
-        });
-    }
-
     onMessage(any: any): void {
         this.bot.on('scan', qrcode => {
             if (qrcode) {
@@ -291,7 +265,7 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         this.bot.on('message', async (msg) => {
 
-                if (await this.isDuplicateMessage(msg._newMsgId + '')) {
+                if (await this.wxMessageHelper.isDuplicateMessage(msg._newMsgId + '')) {
                     return
                 }
 
@@ -308,22 +282,23 @@ export class WxClient extends AbstractClient<GeweBot> {
 
         })
         this.bot.on('friendship', async (friendship) => {
-
-            // @ts-ignore
-            if (await this.isDuplicateMessage(friendship.fromId + '')) {
-                return
+            // @ts-ignore - gewechaty Friendship type has these properties
+            const fromId = friendship.fromId;
+            if (await this.wxMessageHelper.isDuplicateMessage(fromId + '')) {
+                return;
             }
 
-            this.friendshipList.push(friendship)
-            const tgBotClient = this.botClient
+            this.friendshipList.push(friendship);
+            const tgBotClient = this.botClient;
+
             tgBotClient.sendMessage({
                 msgType: 'text',
-                // @ts-ignore
+                // @ts-ignore - gewechaty Friendship type has these properties
                 content: `<b>${friendship.fromName}</b> 请求添加您为好友:\n  ${friendship.hello()}`,
                 ext: {
                     parse_mode: 'HTML',
                     reply_markup: {
-                        // @ts-ignore
+                        // @ts-ignore - gewechaty Friendship type has these properties
                         inline_keyboard: [[Markup.button.callback('接受', `fr:${friendship.fromId}`)]]
                     }
                 },
@@ -332,8 +307,8 @@ export class WxClient extends AbstractClient<GeweBot> {
                 tgBotClient.sendMessage({
                     msgType: "text",
                     content: '接收到了好友请求，请在手机查看'
-                })
-            })
+                });
+            });
         })
         this.bot.on('all', payload => {
             // this.logDebug('on all', payload)
@@ -341,9 +316,6 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {
-            if (await this.isDuplicateMessage(msg._newMsgId + '')) {
-                return
-            }
             parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
                 const botClient = this.botClient
                 this.prismaService.prisma.message.findFirstOrThrow({
@@ -359,9 +331,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                             message_id: Number(message.tg_msg_id)
                         }
                     }).then(() => {
-                        this.prismaService.prisma.wx_msg_filter.create({
-                            data: {id: msg._newMsgId.toString()}
-                        }).then()
+                        this.wxMessageHelper.isDuplicateMessage(msg._newMsgId.toString());
                     })
                 })
             })

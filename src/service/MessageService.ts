@@ -9,7 +9,7 @@ import BotClient from "../client/BotClient";
 import {autoInjectable, delay, inject, singleton} from "tsyringe";
 import {AbstractService} from "../base/IService";
 
-@autoInjectable()
+
 @singleton()
 export class MessageService extends AbstractService {
     public static readonly snowflake = new Snowflake();
