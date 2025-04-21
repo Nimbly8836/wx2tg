@@ -2,11 +2,11 @@ import {Markup} from "telegraf";
 
 export type SettingType = {
     /** 屏蔽公众号消息 */
-    blockPublicMessages: boolean | true,
+    blockPublicMessages: boolean,
     /** 屏蔡表情包 */
-    blockStickers: boolean | false,
+    blockStickers: boolean,
     /** 屏蔽自己在微信客户端发送的消息 */
-    blockYouSelfMessage: boolean | false,
+    blockYouSelfMessage: boolean,
 }
 
 export const defaultSetting: SettingType = {

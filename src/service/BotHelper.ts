@@ -540,8 +540,11 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
             this.prismaService.getConfigCurrentLoginWxAndToken().then(async config => {
                 const settings = config.setting as SettingType
                 let needUpdate = false
-                for (let defaultSettingKey in defaultSetting) {
-                    if (!settings[defaultSettingKey]) {
+                // 修复判断逻辑：遍历默认设置，检查当前设置中是否缺少任何键
+                // 或者类型不匹配（undefined vs boolean等）
+                for (const defaultSettingKey in defaultSetting) {
+                    if (settings[defaultSettingKey] === undefined ||
+                        typeof settings[defaultSettingKey] !== typeof defaultSetting[defaultSettingKey]) {
                         needUpdate = true
                         settings[defaultSettingKey] = defaultSetting[defaultSettingKey]
                     }
