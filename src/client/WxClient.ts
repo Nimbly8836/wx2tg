@@ -311,8 +311,6 @@ export class WxClient extends AbstractClient<GeweBot> {
             });
         })
         this.bot.on('all', payload => {
-            // this.logDebug('on all', payload)
-            // payload.type
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {

@@ -204,11 +204,11 @@ export default class TgClient extends AbstractClient<TelegramClient> {
         if (this.bot.connected) {
             // 监听所有接收的消息
             this.bot.addEventHandler(event => {
-                if (groupIds.has(event.chatId.toJSNumber())) {
+                if (groupIds.has(event.chatId?.toJSNumber())) {
                     this.prismaService.getConfigCurrentLoginWxAndToken().then(config => {
                         this.prismaService.prisma.group.findUnique({
                             where: {
-                                tg_group_id: event.chatId.toJSNumber(),
+                                tg_group_id: event.chatId?.toJSNumber(),
                                 config_id: config.id,
                             }
                         }).then(async group => {
@@ -222,13 +222,13 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                             // 自己部署的机器人的消息不转发
                             const config = await this.prismaService.getConfigByToken()
                             if (event.message.fromId instanceof Api.PeerUser) {
-                                if (Number(config.bot_id) == event.message.fromId.userId.toJSNumber()) {
+                                if (Number(config.bot_id) == event.message.fromId?.userId?.toJSNumber()) {
                                     forward = false
                                 }
                             }
                             if (allowIds.includes(BigInt(1))) {
                                 if (event.message.fromId instanceof Api.PeerUser) {
-                                    const disableIdWhenAll = -(event.message.fromId.userId.toJSNumber())
+                                    const disableIdWhenAll = -(event.message.fromId?.userId?.toJSNumber())
                                     if (allowIds.includes(BigInt(disableIdWhenAll))) {
                                         forward = false
                                     }
@@ -236,7 +236,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
 
                             } else { // 只转发指定的
                                 if (event.message.fromId instanceof Api.PeerUser) {
-                                    const checkId = event.message.fromId.userId.toJSNumber()
+                                    const checkId = event.message.fromId?.userId?.toJSNumber()
                                     if (!allowIds.includes(BigInt(checkId))) {
                                         forward = false
                                     }
@@ -246,7 +246,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                             if (forward) {
                                 messageService.addMessages({
                                     msgType: 'text',
-                                    chatId: event.chatId.toJSNumber(),
+                                    chatId: event.chatId?.toJSNumber(),
                                     content: event.message.text,
                                 }, ClientEnum.WX_BOT)
 
@@ -261,7 +261,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                                         messageService.addMessages({
                                             content: "",
                                             msgType: mimeTypeSplit?.[0] === 'image' ? 'image' : 'file',
-                                            chatId: event.chatId.toJSNumber(),
+                                            chatId: event.chatId?.toJSNumber(),
                                             file: outputFile,
                                             fileName: fileName,
                                         }, ClientEnum.WX_BOT)
@@ -280,7 +280,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
             this.bot.addEventHandler(event => {
                 this.prismaService.prisma.group.findUnique({
                     where: {
-                        tg_group_id: event.chatId.toJSNumber(),
+                        tg_group_id: event.chatId?.toJSNumber(),
                     }
                 }).then(async group => {
                     if (group) {
@@ -314,7 +314,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                 })
             }, new DeletedMessage({
                 func: (event: DeletedMessageEvent) => {
-                    return groupIds.has(event.chatId.toJSNumber())
+                    return groupIds.has(event.chatId?.toJSNumber())
                 }
             }))
         }

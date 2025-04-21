@@ -111,7 +111,14 @@ export default class BotClient extends AbstractClient<Telegraf> {
                     break;
                 case "text":
                 case "image": // 先发送文字
-                    result = telegram.sendMessage(msg.chatId, text, msg.ext)
+                    let isGh = false
+                    if (msg.fromWxId.startsWith('gh_')) {
+                        isGh = true
+                    }
+                    result = telegram.sendMessage(msg.chatId, text, {
+                        ...msg.ext,
+                        parse_mode: isGh ? 'HTML' : undefined
+                    })
                     break;
                 case "audio":
                     // result = telegram.sendAudio(msg.chatId, {source: msg.file}, msg.ext)
