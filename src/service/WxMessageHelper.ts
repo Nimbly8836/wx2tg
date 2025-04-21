@@ -314,7 +314,7 @@ export class WxMessageHelper extends AbstractService {
                         content: content,
                         title: title,
                         msgType: 'text',
-                        fromWxId: talker.wxid(),
+                        fromWxId: talker.wxid() || msg.wxid,
                         wxMsgUserName: wx_msg_user_name || '',
                         wxMsgType: msg._type,
                         ext: {
