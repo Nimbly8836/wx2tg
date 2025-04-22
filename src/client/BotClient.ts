@@ -112,7 +112,7 @@ export default class BotClient extends AbstractClient<Telegraf> {
                 case "text":
                 case "image": // 先发送文字
                     let isGh = false
-                    if (msg.fromWxId.startsWith('gh_')) {
+                    if (msg.fromWxId?.startsWith('gh_')) {
                         isGh = true
                     }
                     result = telegram.sendMessage(msg.chatId, text, {

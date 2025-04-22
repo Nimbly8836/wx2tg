@@ -111,7 +111,7 @@ export class MessageService extends AbstractService {
                                     wx_msg_type: sendMessage.wxMsgType ?? resMsg?.type,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText ?? sendMessage.msgType,
                                     wx_msg_create: Number(sendMessage.ext?.wxMsgCreate) ?? Number(resMsg?.createTime),
-                                    msg_id: sendMessage.ext?.msgId?.toString() ?? resMsg?.msgId.toString(),
+                                    msg_id: sendMessage.ext?.msgId?.toString() ?? resMsg?.msgId?.toString(),
                                 },
                             }).then(() => {
                                 this.logDebug('Message saved');
@@ -161,18 +161,27 @@ export class MessageService extends AbstractService {
                             sendMessage.isSending = false
                             sendMessage.success = false // Mark as failed
                             // 发送提示
-                            const tgClient = this.clients.get(ClientEnum.TG_BOT) as TgClient;
+                            const botClient = this.clients.get(ClientEnum.TG_BOT) as BotClient;
                             // 发送失败提示
-                            tgClient.sendMessage({
+                            botClient.sendMessage({
                                 msgType: 'text',
                                 chatId: sendMessage.chatId,
                                 content: '消息发送失败',
-                                // ext: {
-                                //     reply_parameters: {
-                                //         message_id:
-                                //     }
-                                // }
-                            }).then()
+                                ext: {
+                                    reply_parameters: {
+                                        message_id: sendMessage.tgMsgId
+                                    }
+                                }
+                            }).then().catch((err) => {
+                                botClient.sendMessage({
+                                    msgType: 'text',
+                                    chatId: sendMessage.chatId,
+                                    content: `<blockquote>${sendMessage.content}</blockquote>消息发送失败`,
+                                    ext: {
+                                        parse_mode: 'HTML'
+                                    }
+                                }).then()
+                            })
                         }
                     });
                 this.prismaService.prisma.message.create({

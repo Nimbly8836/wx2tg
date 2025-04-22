@@ -149,7 +149,7 @@ export default class TgClient extends AbstractClient<TelegramClient> {
                 case "file":
                     this.bot.sendFile(msgParams.chatId,
                         {
-                            file: (msgParams.file + '/' + msgParams.fileName) as string,
+                            file: msgParams.file + '/' + msgParams.fileName,
                         }
                     ).then(resolve).catch(reject)
                     break;
