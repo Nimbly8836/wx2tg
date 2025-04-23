@@ -66,7 +66,7 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            xleat/wx2tg:${{ env.APP_VERSION }}-${{ matrix.platform }}
+            xleat/wx2tg:${{ github.ref_name }}-${{ matrix.platform }}
             xleat/wx2tg:latest-${{ matrix.platform }}
           platforms: ${{ matrix.docker-platform }}
           cache-from: type=gha,scope=${{ matrix.platform }}
@@ -84,8 +84,7 @@ jobs:
 
       - name: Create and push manifest
         run: |
-          # Extract version without 'v' prefix
-          VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          VERSION=${{ github.ref_name }}
           
           # Create and push version-specific manifest
           docker manifest create xleat/wx2tg:$VERSION \
