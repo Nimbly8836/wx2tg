@@ -55,6 +55,10 @@ export class WxClient extends AbstractClient<GeweBot> {
         if (!fs.existsSync(path)) {
             fs.mkdirSync(path, {recursive: true})
         }
+        // gewe 文件需要的路径
+        if (!fs.existsSync(Constants.GEWE_PATH)) {
+            fs.mkdirSync(Constants.GEWE_PATH, {recursive: true})
+        }
         return new Promise<boolean>((resolve, reject) => {
 
             if (this.hasLogin) {
