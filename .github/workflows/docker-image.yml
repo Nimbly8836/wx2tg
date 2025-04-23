@@ -105,5 +105,4 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
           repository: xleat/wx2tg
-          readme-filepath: ./README.md
           short-description: 'telegram收发微信消息'
