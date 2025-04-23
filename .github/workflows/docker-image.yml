@@ -71,6 +71,7 @@ jobs:
           platforms: ${{ matrix.docker-platform }}
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          provenance: false
 
   create-manifest:
     needs: build
