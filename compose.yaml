@@ -6,13 +6,18 @@ services:
       - wx2tg-db
       - gewe
     env_file:
-      - .env.docker
+      - .env
     volumes: # 示例，换成你的 volumes
       - ./storage:/app/storage
       - ./logs:/app/logs
     restart: unless-stopped
 
   gewe:
+    # image: docker.io/wuhuan123/gewechat:latest
+    # image: registry.cn-hangzhou.aliyuncs.com/gewe/gewe:latest
+    # image: registry.cn-chengdu.aliyuncs.com/tu1h/wechotd:alpine
+    # image: docker.io/wanano/gewe:latest
+    ## 上面是一些可用的镜像，下面是我用过的比较稳定的镜像
     image: docker.io/xleat/gewe:latest
     container_name: gewe
     volumes: # 示例，换成你的 volumes
@@ -25,11 +30,9 @@ services:
     container_name: wx2tg-db
     restart: unless-stopped
     volumes: # 示例，换成你的 volumes
-      - ./data/db:/var/lib/postgresql/data
+      - ./pg:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: wx2tg
-      POSTGRES_PASSWORD: example # 记得修改 POSTGRES 的密码
+      POSTGRES_USER: postgres  # 可选，默认用户
+      POSTGRES_PASSWORD: wx2tg_pass00123 # 记得修改 POSTGRES 的密码
       PGDATA: /var/lib/postgresql/data/pgdata
-
-
-
