@@ -211,7 +211,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                             toWxId: group.wx_id,
                                             newMsgId: quoteMsg.wx_msg_id,
                                             content: quoteMsg.content,
-                                        }).then()
+                                        }).then(resolve).catch(reject)
                                     })
                                     break;
                                 default:

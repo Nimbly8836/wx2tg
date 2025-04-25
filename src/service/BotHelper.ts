@@ -380,6 +380,7 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                     tgMsgId: ctx.message.message_id,
                     content: text,
                     replyId: replyMessageId,
+                    // parentId: Number(replyMessageId),
                 }, ClientEnum.WX_BOT)
             })
 
@@ -1314,30 +1315,31 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 this.wxClient.bot.Room.find({id: group.wx_id}).then(findWxRoom => {
                     findWxRoom.sync().then(syncedRoom => {
                         this.logDebug('syncedRoom', syncedRoom)
-                        this.prismaService.syncRoomDb(syncedRoom.chatroomId)
-                        // 更新头像
-                        if (force || syncedRoom.avatarImg !== group.headImgUrl) {
-                            this.prismaService.prisma.group.update({
-                                where: {id: group.id},
-                                data: {
-                                    headImgUrl: syncedRoom.avatarImg
-                                }
-                            }).then()
-                            updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
-                                .then()
-                        }
-                        // 更新名称
-                        if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
-                            this.prismaService.prisma.group.update({
-                                where: {id: group.id},
-                                data: {
-                                    group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
-                                }
-                            }).then()
-                            updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
-                                .then()
-                        }
-                        ctx.reply('同步成功')
+                        this.prismaService.syncRoomDb(syncedRoom.chatroomId).then(() => {
+                            // 更新头像
+                            if (force || syncedRoom.avatarImg !== group.headImgUrl) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        headImgUrl: syncedRoom.avatarImg
+                                    }
+                                }).then()
+                                updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
+                                    .then()
+                            }
+                            // 更新名称
+                            if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
+                                this.prismaService.prisma.group.update({
+                                    where: {id: group.id},
+                                    data: {
+                                        group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
+                                    }
+                                }).then()
+                                updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
+                                    .then()
+                            }
+                            ctx.reply('同步成功')
+                        })
                     }).catch(e => {
                         this.logError('syncRoom', e)
                         ctx.reply('同步失败')

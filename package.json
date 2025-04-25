@@ -1,6 +1,6 @@
 {
   "name": "wx2tg",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "simple kit send wechat message to telegram",
   "main": "app.ts",
   "esModuleInterop": true,
@@ -26,6 +26,7 @@
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.2",
     "gewechaty": "https://github.com/Nimbly8836/gewechaty/releases/download/v0.0.36/gewechaty-0.0.36.tgz",
+    "he": "^1.2.0",
     "https-proxy-agent": "^7.0.4",
     "jsdom": "^24.1.0",
     "log4js": "^6.9.1",
@@ -48,6 +49,7 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@types/he": "^1.2.3",
     "@types/jest": "29.5.14",
     "@types/node": "22.10.10",
     "@types/qrcode": "^1.5.5",

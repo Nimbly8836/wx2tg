@@ -62,7 +62,6 @@ export class MessageService extends AbstractService {
     }
 
     private processQueue() {
-        const wxClient = this.clients.get(ClientEnum.WX_BOT) as WxClient;
         if (this.messageQueue.length > 0) {
             const sendMessage = this.messageQueue.shift();
             let retryCount = sendMessage?.retriesNumber || 0;
@@ -101,7 +100,7 @@ export class MessageService extends AbstractService {
                                     }
                                 },
                                 update: {
-                                    from_wx_id: sendMessage.fromWxId ?? wxClient?.me?.wxid,
+                                    from_wx_id: sendMessage.fromWxId,
                                     content: sendMessage.content,
                                     tg_msg_id: sendMessage.tgMsgId ?? resMsg?.message_id,
                                     wx_msg_id: sendMessage.ext?.wxMsgId ?? resMsg?.newMsgId?.toString(),
@@ -110,7 +109,7 @@ export class MessageService extends AbstractService {
                                     wx_msg_text: sendMessage.ext?.wxMsgText,
                                     wx_msg_type: sendMessage.wxMsgType ?? resMsg?.type,
                                     wx_msg_type_text: sendMessage.wxMsgTypeText ?? sendMessage.msgType,
-                                    wx_msg_create: Number(sendMessage.ext?.wxMsgCreate) ?? Number(resMsg?.createTime),
+                                    wx_msg_create: Number(sendMessage.ext?.wxMsgCreate ?? resMsg?.createTime),
                                     msg_id: sendMessage.ext?.msgId?.toString() ?? resMsg?.msgId?.toString(),
                                 },
                             }).then(() => {
