@@ -126,7 +126,7 @@ export async function parseQuoteMsg(quoteMsg: string): Promise<any> {
     })
 }
 
-export async function parseSysMsgPayload(messageContent: string): Promise<SysMsgPayload> {
+export async function parseRevokeMsgPayload(messageContent: string): Promise<SysMsgPayload> {
     return new Promise((resolve, reject) => {
         xmlToJson(messageContent).then((sysMsgPayload: SysMsgXmlSchema) => {
             return resolve({

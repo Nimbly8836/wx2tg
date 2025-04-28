@@ -7,15 +7,14 @@ import BotClient from "../client/BotClient";
 import {Constants} from "../constant/Constants";
 import {SendMessage} from "../base/IMessage";
 import {defaultSetting} from "../util/SettingUtils";
-import {parseSysMsgPayload} from "../util/MessageUtils";
+import {parseRevokeMsgPayload} from "../util/MessageUtils";
 import {Markup} from "telegraf";
 import fs from "node:fs";
 import {getBaseHttpAddress} from "../util/Gewechaty";
 import {quote} from "../util/GewePostUtils";
-import {inject, delay, singleton} from "tsyringe";
+import {delay, inject, singleton} from "tsyringe";
 import {randomUUID} from "node:crypto";
 import {WxMessageHelper} from "../service/WxMessageHelper";
-import {ClientEnum} from "../constant/ClientConstants";
 import {getService} from "../di";
 
 @singleton()
@@ -318,24 +317,30 @@ export class WxClient extends AbstractClient<GeweBot> {
         })
         // 撤回消息
         this.bot.on('revoke', async msg => {
-            parseSysMsgPayload(msg.text()).then(sysMsgPayload => {
+            parseRevokeMsgPayload(msg.text()).then(sysMsgPayload => {
                 const botClient = this.botClient
-                this.prismaService.prisma.message.findFirstOrThrow({
-                    where: {
-                        wx_msg_id: sysMsgPayload.revokemsg?.newmsgid
-                    },
-                    include: {
-                        group: true
+                this.wxMessageHelper.isDuplicateMessage(sysMsgPayload.revokemsg?.newmsgid).then(result => {
+                    if (result) {
+                        return
                     }
-                }).then(message => {
-                    botClient.bot.telegram.sendMessage(Number(message.group.tg_group_id), '消息被撤回', {
-                        reply_parameters: {
-                            message_id: Number(message.tg_msg_id)
+                    this.prismaService.prisma.message.findFirstOrThrow({
+                        where: {
+                            wx_msg_id: sysMsgPayload.revokemsg?.newmsgid
+                        },
+                        include: {
+                            group: true
                         }
-                    }).then(() => {
-                        this.wxMessageHelper.isDuplicateMessage(msg._newMsgId.toString());
+                    }).then(message => {
+                        botClient.bot.telegram.sendMessage(Number(message.group.tg_group_id), '消息被撤回', {
+                            reply_parameters: {
+                                message_id: Number(message.tg_msg_id)
+                            }
+                        }).then(() => {
+
+                        })
                     })
                 })
+
             })
         })
     }
