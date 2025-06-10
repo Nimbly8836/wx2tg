@@ -1,5 +1,4 @@
 import {AbstractClient} from "../base/AbstractClient";
-import {Contact, ContactSelf, Filebox, GeweBot, Room} from "gewechaty";
 import {ConfigEnv} from "../config/Config";
 import QRCode from 'qrcode'
 import PrismaService from "../service/PrismaService";
@@ -16,32 +15,29 @@ import {delay, inject, singleton} from "tsyringe";
 import {randomUUID} from "node:crypto";
 import {WxMessageHelper} from "../service/WxMessageHelper";
 import {getService} from "../di";
+import {Contact, Room, WxBot} from "@wx2tg/wx2tg-puppe-v4";
+import {FileBox} from "file-box";
 
 @singleton()
-export class WxClient extends AbstractClient<GeweBot> {
+export class WxClient extends AbstractClient<WxBot> {
 
     private scanPhotoMsgId: number[] = []
 
-    private readonly cid: string;
-
-    public me: ContactSelf
+    public me: Contact
     public friendshipList = []
 
-    private wxMessageHelper: WxMessageHelper;
+    private readonly wxMessageHelper: WxMessageHelper;
 
     constructor(@inject(delay(() => PrismaService)) readonly prismaService: PrismaService,
                 @inject(delay(() => BotClient)) readonly botClient: BotClient) {
         super();
-        this.cid = randomUUID().toString()
-        this.bot = new GeweBot({
-            base_api: ConfigEnv.BASE_API,
-            file_api: ConfigEnv.FILE_API,
-            port: ConfigEnv.GEWE_PORT,
-            static: ConfigEnv.GEWE_STATIC,
-            proxy: ConfigEnv.GEWE_PROXY,
+        this.bot = new WxBot({
+            baseUrl: ConfigEnv.BASE_API,
             // debug: false,
-            cache_path: 'storage/gewe',
-            ip: ConfigEnv.GEWE_IP,
+            databasePath: 'storage/gewe',
+            callbackHostName: "",
+            callbackPort: 3000,
+            deviceType: 'iPadX'
         })
         this.wxMessageHelper = getService(WxMessageHelper);
     }
@@ -68,11 +64,10 @@ export class WxClient extends AbstractClient<GeweBot> {
             this.loginTime = new Date().getTime() / 1000
 
             if (this.ready) {
-                return this.bot.login().then(resolve).catch(reject)
+                return this.bot.login().then(() => resolve).catch(reject)
             }
 
-            this.bot.start().then(async ({app, router}) => {
-                app.use(router.routes()).use(router.allowedMethods())
+            this.bot.start().then(async () => {
 
                 // 更新 config 表 wx_id 插入缓存的 concat 和 room
                 let prismaService = this.prismaService
@@ -157,10 +152,10 @@ export class WxClient extends AbstractClient<GeweBot> {
 
     logout(): Promise<boolean> {
         return new Promise<boolean>((resolve, reject) => {
-            this.bot.logout().then(() => {
-                this.hasLogin = false
-                resolve(true)
-            }).catch(reject)
+            // this.bot.logout().then(() => {
+            //     this.hasLogin = false
+            //     resolve(true)
+            // }).catch(reject)
         })
     }
 
@@ -181,8 +176,11 @@ export class WxClient extends AbstractClient<GeweBot> {
                     }).then(group => {
                         const send = (to: Contact | Room) => {
                             switch (msgParams.msgType) {
+                                case "location":
+                                    break;
                                 case "text":
                                     this.logDebug('wx 发消息', msgParams)
+                                    // @ts-ignore
                                     to.say(msgParams.content).then(resolve).catch(reject)
                                     break;
                                 case 'video': // 视频使用文件类型
@@ -194,7 +192,8 @@ export class WxClient extends AbstractClient<GeweBot> {
                                     if (!file.startsWith('http')) {
                                         file = new URL(file.substring(Constants.SAVE_PATH.length), getBaseHttpAddress()).toString();
                                     }
-                                    const fileBox = Filebox.fromUrl(file, forceType)
+                                    const fileBox = FileBox.fromUrl(file, forceType)
+                                    // @ts-ignore
                                     to.say(fileBox).then(resolve).catch(reject)
                                 }
                                     break;
@@ -213,6 +212,10 @@ export class WxClient extends AbstractClient<GeweBot> {
                                         }).then(resolve).catch(reject)
                                     })
                                     break;
+                                case "emoji":
+                                    break;
+                                case "redPacket":
+                                    break;
                                 default:
                                     break;
 
@@ -224,7 +227,7 @@ export class WxClient extends AbstractClient<GeweBot> {
                                 send(room)
                             })
                         } else if (group.wx_contact?.userName) {
-                            this.bot.Contact.find({wxid: group.wx_contact?.userName}).then(contact => {
+                            this.bot.Contact.find({id: group.wx_contact?.userName}).then(contact => {
                                 send(contact)
                             }).catch((e) => {
                                 this.logError('find contact error : %s', e)
@@ -242,7 +245,8 @@ export class WxClient extends AbstractClient<GeweBot> {
     }
 
     check(): Promise<any> {
-        return this.bot.checkOnline()
+        return new Promise<any>((resolve, reject) => {})
+        // return this.bot.checkOnline()
     }
 
     onMessage(any: any): void {

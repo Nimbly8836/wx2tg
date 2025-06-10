@@ -1,5 +1,4 @@
 import {AbstractService} from "../base/IService";
-import {Contact, Filebox, Message} from "gewechaty";
 import PrismaService from "./PrismaService";
 import TgClient from "../client/TgClient";
 import {Api} from "telegram";
@@ -18,15 +17,14 @@ import {ConfigEnv} from "../config/Config";
 import BotClient from "../client/BotClient";
 import {MessageType} from "../entity/Message";
 import {singleton} from "tsyringe";
-import {WxFileClient} from "../client/WxFileClient";
 import {getService} from "../di";
+import {Contact, Message} from "@wx2tg/wx2tg-puppe-v4";
 
 @singleton()
 export class WxMessageHelper extends AbstractService {
     private readonly messageService: MessageService;
     private readonly tgClient: TgClient;
     private readonly botClient: BotClient;
-    private readonly wxFileClient: WxFileClient;
     private readonly prismaService: PrismaService;
     private readonly messageSet: Set<string> = new Set();
 
@@ -35,7 +33,6 @@ export class WxMessageHelper extends AbstractService {
         this.messageService = getService(MessageService);
         this.tgClient = getService(TgClient);
         this.botClient = getService(BotClient);
-        this.wxFileClient = getService(WxFileClient);
         this.prismaService = getService(PrismaService);
     }
 
@@ -60,7 +57,7 @@ export class WxMessageHelper extends AbstractService {
                             });
                     }
                     // 自己的情况下 名称用对方的
-                    if (contact.wxid() === msg.wxid) {
+                    if (contact.wxid === msg.wxid + "") {
                         msg.to().then(toContact => {
                             getTitle(toContact)
                         })
@@ -80,7 +77,7 @@ export class WxMessageHelper extends AbstractService {
             wxId = msg.roomId
         }
         // 自己发的消息不创建
-        if (msg._self) {
+        if (msg.self()) {
             wxId = msg.isRoom ? msg.roomId : msg.toId
         }
         return new Promise((resolve, reject) => {
@@ -98,9 +95,9 @@ export class WxMessageHelper extends AbstractService {
                 if (!existGroup) {
                     const title = await this.getTitle(msg) || 'wx2tg_未命名群组';
                     const createGroupParams = {
-                        isRoom: msg.isRoom,
-                        loginWxId: msg.wxid,
-                        roomId: msg.roomId,
+                        isRoom: Boolean(msg.isRoom),
+                        loginWxId: await msg.wxid(),
+                        roomId: msg.roomId(),
                         fromId: msg.fromId,
                         configId: config.id,
                         channelId: 0,
@@ -113,7 +110,7 @@ export class WxMessageHelper extends AbstractService {
                 } else {
                     // 重复的消息不处理，经过一段时间还是有可能有重复的消息
                     this.prismaService.prisma.message.findFirst({
-                        where: {wx_msg_id: msg._newMsgId?.toString(), group_id: existGroup.id},
+                        where: {wx_msg_id: msg.newMsgId?.toString(), group_id: existGroup.id},
                     }).then(async (message) => {
                         if (message) {
                             this.logDebug('重复消息 id: %s', message.id)
@@ -125,7 +122,7 @@ export class WxMessageHelper extends AbstractService {
                                 this.prismaService.prisma.wx_room.findUnique({
                                     where: {
                                         wx_id_chatroomId: {
-                                            wx_id: msg.wxid,
+                                            wx_id: await msg.wxid(),
                                             chatroomId: wxId,
                                         }
                                     },
@@ -145,7 +142,7 @@ export class WxMessageHelper extends AbstractService {
                                 this.prismaService.prisma.wx_contact.findUnique({
                                     where: {
                                         wx_id_userName: {
-                                            wx_id: msg.wxid,
+                                            wx_id: await msg.wxid(),
                                             userName: wxId,
                                         }
                                     }
@@ -168,7 +165,7 @@ export class WxMessageHelper extends AbstractService {
                     })
                     // 检查头像是否需要更新
                     // 自己发的消息不更新头像
-                    if (msg._self) {
+                    if (msg.self()) {
                         return
                     }
                     // 后面去更新头像
@@ -176,15 +173,15 @@ export class WxMessageHelper extends AbstractService {
                         this.prismaService.prisma.wx_room.findUnique({
                             where: {
                                 wx_id_chatroomId: {
-                                    wx_id: msg.wxid,
-                                    chatroomId: msg.roomId,
+                                    wx_id: await msg.wxid(),
+                                    chatroomId: msg.roomId(),
                                 },
                             }
                         }) :
                         this.prismaService.prisma.wx_contact.findUnique({
                             where: {
                                 wx_id_userName: {
-                                    wx_id: msg.wxid,
+                                    wx_id: await msg.wxid(),
                                     userName: msg.fromId,
                                 },
                             }
@@ -217,7 +214,7 @@ export class WxMessageHelper extends AbstractService {
                                     }).then()
                                     updatePhoto(existEntity.smallHeadImgUrl)
                                 }
-                            } else if (!msg._self && existEntity.bigHeadImgUrl !== existGroup.headImgUrl) {
+                            } else if (!msg.self() && existEntity.bigHeadImgUrl !== existGroup.headImgUrl) {
                                 this.prismaService.prisma.group.update({
                                     where: {id: existGroup.id},
                                     data: {
@@ -267,7 +264,7 @@ export class WxMessageHelper extends AbstractService {
                     return
                 }
                 // 自己发送的消息
-                if (setting.blockYouSelfMessage && msg._self) {
+                if (setting.blockYouSelfMessage && msg.self()) {
                     return
                 }
             }
@@ -281,8 +278,9 @@ export class WxMessageHelper extends AbstractService {
                     let content = msg.text()
                     let title = ''
                     let wx_msg_user_name: string | void = ''
-                    const talker = await msg.talker();
-                    if (msg._self) {
+                    // FIXME: 这里是错误的
+                    const talker = await msg.toContact();
+                    if (msg.self()) {
                         title = '你:'
                         wx_msg_user_name = '你'
                     } else {
@@ -292,8 +290,8 @@ export class WxMessageHelper extends AbstractService {
                         const wx_room = await this.prismaService.prisma.wx_room.findUnique({
                             where: {
                                 wx_id_chatroomId: {
-                                    wx_id: msg.wxid,
-                                    chatroomId: msg.roomId,
+                                    wx_id:await msg.wxid(),
+                                    chatroomId: msg.roomId(),
                                 }
                             }
                         })
@@ -314,11 +312,11 @@ export class WxMessageHelper extends AbstractService {
                         content: content,
                         title: title,
                         msgType: 'text',
-                        fromWxId: talker.wxid() || msg.wxid,
+                        fromWxId: msg.fromId,
                         wxMsgUserName: wx_msg_user_name || '',
-                        wxMsgType: msg._type,
+                        wxMsgType: msg.msgType(),
                         ext: {
-                            wxMsgId: msg._newMsgId,
+                            wxMsgId: msg.newMsgId,
                             msgId: msg._msgId,
                             wxMsgCreate: msg._createTime,
                         }
@@ -330,7 +328,7 @@ export class WxMessageHelper extends AbstractService {
                         case wxMsgType.RedPacket:
                             addMessage.wxMsgTypeText = MessageType.RedPacket;
                             parseAppMsgMessagePayload(msg.text()).then(appMsg => {
-                                const titlePrefix = msg._self ? '你发送了一个[红包]' : `${wx_msg_user_name}发送了一个[红包]`
+                                const titlePrefix = msg.self() ? '你发送了一个[红包]' : `${wx_msg_user_name}发送了一个[红包]`
                                 const send = (file: Buffer) => {
                                     this.messageService.addMessages({
                                         ...addMessage,
@@ -395,45 +393,45 @@ export class WxMessageHelper extends AbstractService {
                         // 文件类型的消息
                         case wxMsgType.Image: {
                             // 先发送文字
-                            addMessage.content = msg._self ? '你发送了[图片]' : '收到[图片]'
+                            addMessage.content = msg.self() ? '你发送了[图片]' : '收到[图片]'
                             addMessage.wxMsgTypeText = MessageType.Image;
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
-                            const editMsgImage = (fileBox: Filebox) => {
-                                this.prismaService.prisma.message.findFirst({
-                                    where: {wx_msg_id: msg._newMsgId?.toString(), from_wx_id: msg.fromId},
-                                    include: {group: true}
-                                }).then(existingMessage => {
-                                    const tgGroupId = Number(existingMessage?.group?.tg_group_id);
-                                    if (tgGroupId && fileBox && fileBox.url !== ConfigEnv.FILE_API) {
-                                        FileUtils.downloadBuffer(fileBox.url).then(fileBuffer => {
-                                            this.botClient.bot.telegram.editMessageMedia(tgGroupId,
-                                                Number(existingMessage.tg_msg_id),
-                                                null, {
-                                                    type: 'photo',
-                                                    media: {source: fileBuffer},
-                                                    caption: `${wx_msg_user_name}`,
-                                                })
-                                        })
-                                    }
-
-                                    // 这里有可能是消息还没保存到数据库，所以 tgGroupId 为空
-                                    if (!tgGroupId || !existingMessage.tg_msg_id) {
-                                        setTimeout(() => {
-                                            editMsgImage(fileBox)
-                                        }, 1500)
-                                    }
-
-                                })
-                            }
+                            // const editMsgImage = (fileBox: Filebox) => {
+                            //     this.prismaService.prisma.message.findFirst({
+                            //         where: {wx_msg_id: msg.newMsgId?.toString(), from_wx_id: msg.fromId},
+                            //         include: {group: true}
+                            //     }).then(existingMessage => {
+                            //         const tgGroupId = Number(existingMessage?.group?.tg_group_id);
+                            //         if (tgGroupId && fileBox && fileBox.url !== ConfigEnv.FILE_API) {
+                            //             FileUtils.downloadBuffer(fileBox.url).then(fileBuffer => {
+                            //                 this.botClient.bot.telegram.editMessageMedia(tgGroupId,
+                            //                     Number(existingMessage.tg_msg_id),
+                            //                     null, {
+                            //                         type: 'photo',
+                            //                         media: {source: fileBuffer},
+                            //                         caption: `${wx_msg_user_name}`,
+                            //                     })
+                            //             })
+                            //         }
+                            //
+                            //         // 这里有可能是消息还没保存到数据库，所以 tgGroupId 为空
+                            //         if (!tgGroupId || !existingMessage.tg_msg_id) {
+                            //             setTimeout(() => {
+                            //                 // editMsgImage(fileBox)
+                            //             }, 1500)
+                            //         }
+                            //
+                            //     })
+                            // }
 
                             const processFileBox = (msg: Message) => {
                                 const getFileBox = async (type: number) => {
                                     try {
-                                        let fileBox = await msg.toFileBox(type);
-                                        if (fileBox?.url !== ConfigEnv.FILE_API) {
-                                            editMsgImage(fileBox);
-                                            return true;  // 返回成功标志
-                                        }
+                                        // let fileBox = await msg.toFileBox(type);
+                                        // if (fileBox?.url !== ConfigEnv.FILE_API) {
+                                        //     editMsgImage(fileBox);
+                                        //     return true;  // 返回成功标志
+                                        // }
                                         return false;  // 文件API路径，继续尝试
                                     } catch (e) {
                                         return false;  // 获取文件失败，继续尝试
@@ -457,7 +455,7 @@ export class WxMessageHelper extends AbstractService {
                         }
                             break;
                         case wxMsgType.Voice:
-                            addMessage.content = msg._self ? '发送[语音]' : '收到[语音]'
+                            addMessage.content = msg.self() ? '发送[语音]' : '收到[语音]'
                             addMessage.ext.wxMsgText = msg.text()
                             this.messageService.addMessages(addMessage, ClientEnum.TG_BOT)
                             break;
@@ -488,7 +486,7 @@ export class WxMessageHelper extends AbstractService {
 
                             this.logDebug('Video/File message: %s', msg.text())
                             // 先发送文字, 自己发的就不转发了
-                            if (!msg._self) {
+                            if (!msg.self()) {
                                 parseAppMsgMessagePayload(msg.text())
                                     .then(appMsg => {
                                         addMessage.content = '收到[文件] ' + appMsg?.title
@@ -527,8 +525,8 @@ export class WxMessageHelper extends AbstractService {
         // 如果内存中不存在，检查数据库
         return new Promise(resolve => {
             this.prismaService.prisma.wx_msg_filter.upsert({
-                where: { id: msgId },
-                create: { id: msgId },
+                where: {id: msgId},
+                create: {id: msgId},
                 update: {}, // 如果存在就不做任何更新
             }).then((res) => {
                 // 如果记录是新创建的，说明不是重复消息

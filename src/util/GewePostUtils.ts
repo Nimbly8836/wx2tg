@@ -1,4 +1,4 @@
-import {Contact} from "gewechaty";
+import {Contact} from "@wx2tg/wx2tg-puppe-v4";
 import {
     ForwardFile,
     ForwardImage,

@@ -14,7 +14,6 @@ import {Constants} from "../constant/Constants";
 import {defaultSetting, getButtons, SettingType} from "../util/SettingUtils";
 import {createChannel, updateGroupHeadImg, updateGroupTitle} from "./UserClientHelper";
 import {RoomMemberType} from "../entity/Contact";
-import {WxFileClient} from "../client/WxFileClient";
 import {forward} from "../util/GewePostUtils";
 import {MsgType} from "../base/IMessage";
 import {TgMessageUtils} from "../util/TgMessageUtils";
@@ -30,7 +29,6 @@ export default class BotHelper extends AbstractService {
 
     constructor(private readonly prismaService: PrismaService,
                 @inject(delay(() => WxClient)) private readonly wxClient: WxClient,
-                @inject(delay(() => WxFileClient)) private readonly wxFileClient: WxFileClient,
                 @inject(delay(() => TgClient)) private readonly tgClient: TgClient,
                 @inject(delay(() => MessageService)) private readonly messageService: MessageService,
     ) {
@@ -1213,14 +1211,6 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 })
             }
 
-            // 检查是否有登录微信文件助手
-            if (!this.wxFileClient.hasLogin) {
-                ctx.answerCbQuery('请先登录微信文件助手')
-                this.wxFileClient.login().then(() => {
-                })
-            } else {
-                sendFileUseWxFileHelper(ctx);
-            }
         })
 
         bot.action(/^fr:(.*)$/, async ctx => {
@@ -1317,25 +1307,25 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                         this.logDebug('syncedRoom', syncedRoom)
                         this.prismaService.syncRoomDb(syncedRoom.chatroomId).then(() => {
                             // 更新头像
-                            if (force || syncedRoom.avatarImg !== group.headImgUrl) {
+                            if (force || syncedRoom.smallHeadImgUrl !== group.headImgUrl) {
                                 this.prismaService.prisma.group.update({
                                     where: {id: group.id},
                                     data: {
-                                        headImgUrl: syncedRoom.avatarImg
+                                        headImgUrl: syncedRoom.smallHeadImgUrl
                                     }
                                 }).then()
-                                updateGroupHeadImg(syncedRoom.avatarImg, ctx.chat.id)
+                                updateGroupHeadImg(syncedRoom.smallHeadImgUrl, ctx.chat.id)
                                     .then()
                             }
                             // 更新名称
-                            if (syncedRoom.remark !== group.group_name && syncedRoom.name !== group.group_name) {
+                            if (syncedRoom.remark !== group.group_name && syncedRoom.nickName !== group.group_name) {
                                 this.prismaService.prisma.group.update({
                                     where: {id: group.id},
                                     data: {
-                                        group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.name
+                                        group_name: syncedRoom.remark ? syncedRoom.remark : syncedRoom.nickName
                                     }
                                 }).then()
-                                updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.name, ctx.chat.id)
+                                updateGroupTitle(syncedRoom.remark ? syncedRoom.remark : syncedRoom.nickName, ctx.chat.id)
                                     .then()
                             }
                             ctx.reply('同步成功')
@@ -1347,32 +1337,33 @@ user & room 命令在群组使用，能切换当前绑定的用户或者绑定�
                 })
 
             } else {
-                this.wxClient.bot.Contact.find({wxid: group.wx_id}).then(findWxContact => {
+                this.wxClient.bot.Contact.find({id: group.wx_id}).then(findWxContact => {
                     findWxContact.sync().then(syncedContact => {
                         this.logDebug('syncedContact', syncedContact)
                         // 更新头像
-                        if (force || syncedContact._avatarUrl !== group.headImgUrl) {
+                        let newBigFirstHeadUrl = syncedContact.bigHeadImgUrl ?? syncedContact.smallHeadImgUrl;
+                        if (force || newBigFirstHeadUrl !== group.headImgUrl) {
                             this.prismaService.prisma.group.update({
                                 where: {id: group.id},
                                 data: {
-                                    headImgUrl: syncedContact._avatarUrl
+                                    headImgUrl: newBigFirstHeadUrl
                                 }
                             }).then()
-                            updateGroupHeadImg(syncedContact._avatarUrl, ctx.chat.id)
+                            updateGroupHeadImg(newBigFirstHeadUrl, ctx.chat.id)
                                 .then()
                         }
                         // 更新名称
-                        if (syncedContact._alias !== group.group_name && syncedContact._name !== group.group_name) {
+                        if (syncedContact.alias !== group.group_name && syncedContact.nickName !== group.group_name) {
                             this.prismaService.prisma.group.update({
                                 where: {id: group.id},
                                 data: {
-                                    group_name: syncedContact._alias ? syncedContact._alias : syncedContact._name
+                                    group_name: syncedContact.alias ? syncedContact.nickName : syncedContact.nickName
                                 }
                             }).then()
-                            updateGroupTitle(syncedContact._alias ? syncedContact._alias : syncedContact._name, ctx.chat.id)
+                            updateGroupTitle(syncedContact.alias ? syncedContact.alias : syncedContact.nickName, ctx.chat.id)
                                 .then()
                         }
-                        this.prismaService.syncContactDb(syncedContact._wxid).then()
+                        this.prismaService.syncContactDb(syncedContact.userName).then()
                     }).catch(e => {
                         this.logError('syncContact', e)
                         ctx.reply('同步失败')

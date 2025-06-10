@@ -3,7 +3,6 @@ import {LogUtils} from "../util/LogUtils";
 import {Logger} from "log4js";
 import IService from "./IService";
 import {SendMessage} from "./IMessage";
-import {ClientEnum} from "../constant/ClientConstants";
 
 export abstract class AbstractClient<T> implements IClient, IService {
     logger: Logger;
